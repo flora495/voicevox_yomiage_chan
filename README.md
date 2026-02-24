@@ -13,7 +13,7 @@
   "TARGET_USER_IDS": [読み上げ対象のユーザID1,読み上げ対象のユーザID1,...]
 }
 ```
-`pass.json`はgithubにアップロードしないこと。`DISCORD_TOKEN`が必要なので、使いたい人は連絡必要。
+`pass.json`はgithubにアップロードしないこと。
 
 ## Bot設定
 1. Botをサーバーに招待し、`connect`,`speak`の権限を付与する。
@@ -32,17 +32,19 @@
 |`!join`|実行者が参加しているボイスチャンネルにBotが参加する。|
 |`!disconnect`|Botを現在のボイスチャンネルから切断する。|
 |`!speaker`|対応しているキャラクターの一覧を表示。|
-|`!speaker <キャラ名>`|自分の読み上げキャラを変更する（例:!speaker ずんだもん）。|
+|`!speaker <キャラ名>`|自分の読み上げキャラを変更する（例: `!speaker ずんだもん`）。|
 |`!readme`|実行者を読み上げ対象に登録。|
 |`!unreadme`|実行者を読み上げ対象から除外。|
 |`!help`|利用可能なコマンド一覧と簡単な説明を表示。|
+
+## キャラ一覧
 
 ## その他機能
 1. 一定期間(60分)誰も操作しないなら、自動的にオフラインになります。
 
 ## エラーハンドリング
-### Failed to establish a new connection: [WinError 10061] 対象のコンピューターによって拒否されたため、接続できませんでした。
-VOICEVOXのポートが解放されていないことが原因。
+1. `Failed to establish a new connection: [WinError 10061] 対象のコンピューターによって拒否されたため、接続できませんでした。`
+　VOICEVOXのポートが解放されていないことが原因、起動すれば勝手に解放する。
 
 ## ref
 [1] https://32blog.com/programing/ffmpeg-install-guide/

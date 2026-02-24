@@ -11,11 +11,8 @@ from discord.ext import commands
 from wav import tts_to_wav
 
 # ===== パス・設定ファイル読み込み =====
-
 COMMAND_PREFIX = "!"
 
-# このファイル: .../voicevox_yomiage_chan/src/bot.py
-# プロジェクトルート: .../voicevox_yomiage_chan
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 PASS_PATH = PROJECT_ROOT / "settings" / "pass.json"
@@ -32,7 +29,7 @@ VOICEVOX_SPEAKERS = {
     "ずんだもん": 3,
     "四国めたん": 2,
     "春日部つむぎ": 8,
-    "東北きりたん": 10,  # 仮ID。実環境に合わせて変えてください
+    "東北きりたん": 10,
 }
 
 DEFAULT_SPEAKER_NAME = "ずんだもん"

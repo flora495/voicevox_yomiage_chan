@@ -40,5 +40,9 @@
 ## その他機能
 1. 一定期間(60分)誰も操作しないなら、自動的にオフラインになります。
 
+## エラーハンドリング
+### Failed to establish a new connection: [WinError 10061] 対象のコンピューターによって拒否されたため、接続できませんでした。
+VOICEVOXのポートが解放されていないことが原因。
+
 ## ref
 [1] https://32blog.com/programing/ffmpeg-install-guide/

@@ -2,3 +2,4 @@ settings/pass.json
 settings/user_speakers.json
 src/audio_cache
 src/__pycache__
+audio_cache

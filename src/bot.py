@@ -75,7 +75,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 
-bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents, help_command=None)
+bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 
 # ===== ヘルパ =====
 
@@ -150,7 +150,7 @@ async def disconnect(ctx: commands.Context):
 @bot.command()
 async def speaker(ctx: commands.Context, name: str | None = None):
     """
-    自分のキャラ変更コマンド:
+    自分のキャラ変更コマンド。単体ならキャラ一覧を表示。
     例: !speaker ずんだもん
         !speaker   （キャラ一覧を表示）
     """
@@ -161,8 +161,14 @@ async def speaker(ctx: commands.Context, name: str | None = None):
         lines = ["利用可能なキャラ一覧:"]
         for char_name, sid in VOICEVOX_SPEAKERS.items():
             lines.append(f"- {char_name}（ID: {sid}）")
+
+        # 使い方サンプルを追記
+        lines.append("キャラ変更の例↓")
+        lines.append(f"- {COMMAND_PREFIX}speaker ずんだもん")
+
         await ctx.send("\n".join(lines))
         return
+
 
     # ここからは変更処理
     name = name.strip()
@@ -185,32 +191,46 @@ async def speaker(ctx: commands.Context, name: str | None = None):
     )
 
 
-@bot.command(name="help")
-async def show_help(ctx: commands.Context):
+
+@bot.command()
+async def readme(ctx: commands.Context):
     """
-    Botが持っているコマンド一覧を表示する:
-    例: !help
+    自分を読み上げ対象に登録:
+    例: !readme
     """
-    touch_activity()
-
-    lines = []
-    for command in bot.commands:
-        if command.hidden:
-            continue
-
-        name = command.name
-        desc = ""
-        if command.help:
-            desc = command.help.strip().splitlines()[0]
-
-        lines.append(f"{COMMAND_PREFIX}{name} - {desc}")
-
-    if not lines:
-        await ctx.send("利用可能なコマンドはありません。")
+    uid = ctx.author.id
+    if uid in TARGET_USER_IDS:
+        await ctx.send(f"{ctx.author.display_name} さんは既に読み上げ対象です。")
         return
 
-    text = "利用可能なコマンド一覧:\n" + "\n".join(lines)
-    await ctx.send(text)
+    TARGET_USER_IDS.add(uid)
+
+    # pass.json へ反映
+    pass_conf["TARGET_USER_IDS"] = list(TARGET_USER_IDS)
+    with PASS_PATH.open("w", encoding="utf-8") as f:
+        json.dump(pass_conf, f, ensure_ascii=False, indent=2)
+
+    await ctx.send(f"{ctx.author.display_name} さんを読み上げ対象に追加しました。")
+
+
+@bot.command()
+async def unreadme(ctx: commands.Context):
+    """
+    自分を読み上げ対象から外す:
+    例: !unreadme
+    """
+    uid = ctx.author.id
+    if uid not in TARGET_USER_IDS:
+        await ctx.send(f"{ctx.author.display_name} さんは元々読み上げ対象ではありません。")
+        return
+
+    TARGET_USER_IDS.remove(uid)
+
+    pass_conf["TARGET_USER_IDS"] = list(TARGET_USER_IDS)
+    with PASS_PATH.open("w", encoding="utf-8") as f:
+        json.dump(pass_conf, f, ensure_ascii=False, indent=2)
+
+    await ctx.send(f"{ctx.author.display_name} さんを読み上げ対象から削除しました。")
 
 
 
@@ -228,10 +248,11 @@ async def on_message(message: discord.Message):
         await bot.process_commands(message)
         return
 
-    # 特定ユーザ以外は読まない（リストが空ならこの条件を無視して全員対象）
-    if TARGET_USER_IDS and (message.author.id not in TARGET_USER_IDS):
+    # 特定ユーザ以外は読まない
+    if message.author.id not in TARGET_USER_IDS:
         await bot.process_commands(message)
         return
+
 
     # ここまで来たら「読み上げ対象のメッセージ」
     touch_activity()

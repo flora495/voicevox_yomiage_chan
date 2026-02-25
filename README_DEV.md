@@ -5,6 +5,7 @@
 1. ffmpegをインストール(PATHも通す)[1]。
 1. `pip install discord.py`
 1. `pip install pynacl`
+1. `pip install aivoice-python`
 1. `token.json`にDiscordのAPIトークンを追加。
 
 ```
@@ -19,11 +20,13 @@
 
 ## 起動方法
 
-1. VOICEVOXを起動
+1. VOICEVOXを起動。
+1. A.I.VOICE Editorを起動。
 1. `src/bot.py`を起動。
 
 ## その他の機能とか
 1. どこのボイスチャットにも入っていない状態が一定時間続くとdiscord上でのステータスが自動でinvisibleになる。
+1. A.I.Voiceの登録済みキャラクター一覧を確認したい場合check_aivoice_characters.pyを実行せよ。
 
 ## エラーハンドリング
 1. `Failed to establish a new connection: [WinError 10061] 対象のコンピューターによって拒否されたため、接続できませんでした。`

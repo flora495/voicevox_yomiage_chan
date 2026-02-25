@@ -1,15 +1,16 @@
 # tts_aivoice.py
 from typing import Dict, List
-import tempfile
 from pathlib import Path
 from abstract_tts_client import AbstractTTSClient
-from aivoice_python import AIVoiceTTsControl,HostStatus
+from aivoice_python import AIVoiceTTsControl, HostStatus
+import tempfile
+
 
 class AIVoiceClient(AbstractTTSClient):
     def __init__(self):
         self._ctl = AIVoiceTTsControl()
-        
-          # 1. 利用可能なホスト名の先頭を使う
+
+        # 1. 利用可能なホスト名の先頭を使う
         host_names = self._ctl.get_available_host_names()
         if not host_names:
             raise RuntimeError("利用可能な A.I.VOICE ホストが見つかりません。")
@@ -42,49 +43,20 @@ class AIVoiceClient(AbstractTTSClient):
 
         return result
 
-
     def synth_to_wav_bytes(self, text: str, speaker_id: str) -> bytes:
-        print("voice_names:", list(self._ctl.voice_names))
-        print("voice_preset_names:", list(self._ctl.voice_preset_names))
-
+        # speaker_id はプリセット名（または voice_names の要素）を想定
         self._ctl.current_voice_preset_name = speaker_id
         self._ctl.text = text
 
-        debug_dir = Path("debug_wav")
-        debug_dir.mkdir(exist_ok=True)
-        tmp_path = debug_dir / "aivoice_last.wav"
-
-        # 1回だけ保存
-        print(f"[AIVoice TTS] saving wav to: {tmp_path}")
-        self._ctl.save_audio_to_file(str(tmp_path))
-
-        # 実際に存在するかチェック
-        if not tmp_path.exists():
-            print(f"[AIVoice TTS] ERROR: file not found after save: {tmp_path}")
-            return b""
-
-        data = tmp_path.read_bytes()
-        # デバッグ中は消さない方が確認しやすいのでコメントアウト
-        # tmp_path.unlink(missing_ok=True)
-        return data
-
-'''
-    def synth_to_wav_bytes(self, text: str, speaker_id: str) -> bytes:
-        self._ctl.current_voice_preset_name = speaker_id  # 実際のプロパティ名に合わせて
-        self._ctl.text = text
-
-        # 一時ファイルを作成
+        # 一時ファイルを作成してパスだけ使う
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             tmp_path = Path(tmp.name)
-            
 
-        # A.I.VOICE エディタに WAV を書かせる
+        # A.I.VOICE に WAV を書かせる
         self._ctl.save_audio_to_file(str(tmp_path))
 
-        # Python 側で読み戻す
+        # 読み込んで bytes にしてから削除
         data = tmp_path.read_bytes()
         tmp_path.unlink(missing_ok=True)
-        return data
-'''
 
-    
+        return data

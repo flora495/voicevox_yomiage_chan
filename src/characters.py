@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Literal, TypedDict, Dict, List
 
 # VOICEVOX 用
-import json
 import requests
 
 # A.I.VOICE 用

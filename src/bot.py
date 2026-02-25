@@ -53,25 +53,12 @@ AUTOJOIN_USER_IDS = set(user_prefs.get("AUTOJOIN_USER_IDS", []))      # 自動�
 user_speakers_name: Dict[str, str] = user_prefs.get("USER_SPEAKERS", {})
 
 
-def save_user_preferences():
-    """user_preferences.json に現在の設定を書き戻す。"""
-    data = {
-        "TARGET_USER_IDS": list(TARGET_USER_IDS),
-        "AUTOJOIN_USER_IDS": list(AUTOJOIN_USER_IDS),
-        "USER_SPEAKERS": user_speakers_name,
-    }
-    USER_PREFS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with USER_PREFS_PATH.open("w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
 # ==== TTS クライアントを初期化 ====
 voicevox_client = VoicevoxClient()
 aivoice_client = AIVoiceClient()
 
 # ギルドごとの現在キャラ名（サーバーのデフォルトキャラ）
 guild_speakers_name: Dict[int, str] = defaultdict(lambda: DEFAULT_CHARACTER_NAME)
-
 
 
 # ffmpeg オプション
@@ -85,7 +72,6 @@ IDLE_TIMEOUT = 30 * 60  # 30分
 last_work_time = time.time()  # 最後に「仕事」した時刻
 
 
-
 def normalize_char_name(name: str) -> str:
     if name is None:
         return ""
@@ -96,6 +82,18 @@ def normalize_char_name(name: str) -> str:
 
 # 起動時に正規化キーのマップも作る
 NORMALIZED_CHARACTER_MAP = {normalize_char_name(name): name for name in CHARACTER_MAP.keys()}
+
+
+def save_user_preferences():
+    """user_preferences.json に現在の設定を書き戻す。"""
+    data = {
+        "TARGET_USER_IDS": list(TARGET_USER_IDS),
+        "AUTOJOIN_USER_IDS": list(AUTOJOIN_USER_IDS),
+        "USER_SPEAKERS": user_speakers_name,
+    }
+    USER_PREFS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with USER_PREFS_PATH.open("w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def touch_work():
@@ -252,7 +250,7 @@ async def speaker(ctx: commands.Context, *, name: str | None = None):
     """
     自分のキャラ変更コマンド。単体ならキャラ一覧を表示。
     例: !speaker ずんだもん
-        !speaker  紲 星 あ か り
+        !speaker 紲星あかり
     """
     touch_work()
 
@@ -285,6 +283,7 @@ async def speaker(ctx: commands.Context, *, name: str | None = None):
     await ctx.send(
         f"{ctx.author.display_name} さんの読み上げキャラを「{original_name}」に変更しました。"
     )
+
 
 @bot.command()
 async def readme(ctx: commands.Context):

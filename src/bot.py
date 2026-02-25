@@ -1,4 +1,15 @@
 # bot.py
+
+#################################################################
+#　　　　　　　　　　 ∧＿∧
+#　　　　　 ∧＿∧ 　（´<_｀ ）　 Welcome to My Coding Space!
+#　　　　 （ ´_ゝ`）　/　 ⌒i
+#　　　　／　　　＼　 　  |　|
+#　　　 /　　 /￣￣￣￣/　　|
+#　 ＿_(__ﾆつ/　    ＿/ .| .|＿＿＿＿
+#　 　　　＼/＿＿＿＿/　（u　⊃
+#################################################################
+
 import json
 import asyncio
 import time
@@ -9,7 +20,7 @@ from io import BytesIO
 import discord
 from discord.ext import commands
 
-from wav import tts_to_wav_bytes
+from wav import tts_to_wav_bytes, get_voicevox_speakers
 
 # ===== パス・設定ファイル読み込み =====
 COMMAND_PREFIX = "!"
@@ -47,15 +58,10 @@ def save_user_prefs():
     with USER_PREFS_PATH.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+#対象キャラクターを以下に登録する
+VOICEVOX_SPEAKERS=get_voicevox_speakers(["ずんだもん","四国めたん","春日部つむぎ","東北きりたん","東北ずん子","中国うさぎ","あんこもん"])
 
-# VOICEVOXの話者一覧（IDは環境に合わせて調整）
-VOICEVOX_SPEAKERS = {
-    "ずんだもん": 3,
-    "四国めたん": 2,
-    "春日部つむぎ": 8,
-    "東北きりたん": 10,
-}
-
+# デフォルトキャラ
 DEFAULT_SPEAKER_NAME = "ずんだもん"
 DEFAULT_SPEAKER_ID = VOICEVOX_SPEAKERS[DEFAULT_SPEAKER_NAME]
 
@@ -315,10 +321,10 @@ async def unreadme(ctx: commands.Context):
 
 
 @bot.command()
-async def autojoin_add(ctx: commands.Context):
+async def autojoin_on(ctx: commands.Context):
     """
     自分を自動入室対象に登録。
-    例: !autojoin_add
+    例: !autojoin_on
     """
     touch_activity()
 
@@ -336,10 +342,10 @@ async def autojoin_add(ctx: commands.Context):
 
 
 @bot.command()
-async def autojoin_remove(ctx: commands.Context):
+async def autojoin_off(ctx: commands.Context):
     """
     自分を自動入室対象から解除。
-    例: !autojoin_remove
+    例: !autojoin_off
     """
     touch_activity()
 

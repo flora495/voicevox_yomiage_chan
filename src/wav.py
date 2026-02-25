@@ -1,50 +1,90 @@
 # wav.py
 import json
 from pathlib import Path
-
 import requests
 
 HOST = "localhost"
 PORT = 50021
 
-# ① セッションをグローバルに 1 個だけ作る
 session = requests.Session()
-SPEEDSCALE=1.05            # 1.0 が標準、1.1〜1.2 くらいで様子見
-PREPHONEMELENGTH = 0.0    # 発話前の無音
-POSTHONEMELENGTH = 0.0   # 発話後の無音
+
+
+def get_voicevox_speakers(speakers):
+    # VOICEVOXの話者IDを /speakers から動的に取得
+    speaker_map = build_speaker_name_to_id_map()
+
+    # 使いたいキャラだけピックアップ
+    voicevox_speakers = {}
+
+    def add_speaker_if_available(char_name: str):
+        sid = speaker_map.get(char_name)
+        if sid is not None:
+            voicevox_speakers[char_name] = sid
+        else:
+            print(f"[WARN] VOICEVOX speaker '{char_name}' not found in /speakers")
+
+    # 既存 + 追加したいキャラ
+    for name in speakers:
+        add_speaker_if_available(name)
+
+    return voicevox_speakers
+
+def fetch_speakers():
+    """VOICEVOXエンジンから話者一覧を取得して返す。"""
+    url = f"http://{HOST}:{PORT}/speakers"
+    r = session.get(url)
+    r.raise_for_status()
+    return r.json()
+
+
+def build_speaker_name_to_id_map() -> dict[str, int]:
+    """
+    VOICEVOXの /speakers 結果から、
+    「キャラ名（スタイル名省略） -> ノーマル系スタイルのid」
+    のマップを作る。
+    """
+    data = fetch_speakers()
+    mapping: dict[str, int] = {}
+
+    # 「どのスタイルをノーマル扱いにするか」の優先順
+    # （環境によってスタイル名が微妙に違う可能性があるので、含まれていたら採用する方式）
+    preferred_style_names = ["ノーマル", "normal", "ふつう"]
+
+    for speaker in data:
+        name = speaker["name"]              # 例: "ずんだもん"
+        styles = speaker["styles"]          # 各スタイル: {"name": "...", "id": ...}
+
+        # 優先スタイルを探す
+        chosen_id = None
+        for pref in preferred_style_names:
+            for style in styles:
+                if pref in style["name"]:
+                    chosen_id = style["id"]
+                    break
+            if chosen_id is not None:
+                break
+
+        # 見つからなければ、最初のスタイルを採用
+        if chosen_id is None and styles:
+            chosen_id = styles[0]["id"]
+
+        if chosen_id is not None:
+            mapping[name] = chosen_id
+
+    return mapping
 
 
 def tts_to_wav(text: str, out_path: Path, speaker_id: int) -> Path:
-    """
-    VOICEVOXに text を渡して、speaker_id の声で WAV を out_path に保存する。
-    """
-
-    # 1. クエリ生成（session を使う）
     q = session.post(
         f"http://{HOST}:{PORT}/audio_query",
         params={"text": text, "speaker": speaker_id},
     )
     q.raise_for_status()
     query = q.json()
+    query["speedScale"] = 1.1
+    query["prePhonemeLength"] = 0.0
+    query["postPhonemeLength"] = 0.0
 
-    # ② クエリに軽量化パラメータを追加
-    # 話速を少し早く（例: 1.1倍）、前後の無音を削る
-    query["speedScale"] = SPEEDSCALE
-    query["prePhonemeLength"] = PREPHONEMELENGTH
-    #query["postPhonemeLength"] = POSTHONEMELENGTH
-    
-    end = text[-1] if text else ""
-    if end in "。．.!！?？":
-        # 文末: 少し長め
-        query["postPhonemeLength"] = 0.25  # デフォルトより長く
-    elif end in "、,，":
-        # 読点: ちょっとだけ
-        query["postPhonemeLength"] = 0.2
-    else:
-        # それ以外: 短め
-        query["postPhonemeLength"] = 0.05
-
-    # 2. 合成してwav取得（こちらも session を使う）
     s = session.post(
         f"http://{HOST}:{PORT}/synthesis",
         params={"speaker": speaker_id},
@@ -59,27 +99,15 @@ def tts_to_wav(text: str, out_path: Path, speaker_id: int) -> Path:
 
 
 def tts_to_wav_bytes(text: str, speaker_id: int) -> bytes:
-    """WAVファイルではなく、音声データ(bytes)を返す版。"""
     q = session.post(
         f"http://{HOST}:{PORT}/audio_query",
         params={"text": text, "speaker": speaker_id},
     )
     q.raise_for_status()
     query = q.json()
-    query["speedScale"] = SPEEDSCALE
-    query["prePhonemeLength"] = PREPHONEMELENGTH
-    #query["postPhonemeLength"] = POSTHONEMELENGTH
-    
-    end = text[-1] if text else ""
-    if end in "。．.!！?？":
-        # 文末: 少し長め
-        query["postPhonemeLength"] = 0.25  # デフォルトより長く
-    elif end in "、,，":
-        # 読点: ちょっとだけ
-        query["postPhonemeLength"] = 0.2
-    else:
-        # それ以外: 短め
-        query["postPhonemeLength"] = 0.05
+    query["speedScale"] = 1.1
+    query["prePhonemeLength"] = 0.0
+    query["postPhonemeLength"] = 0.0
 
     s = session.post(
         f"http://{HOST}:{PORT}/synthesis",

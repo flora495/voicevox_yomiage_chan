@@ -332,10 +332,10 @@ async def unreadme(ctx: commands.Context):
 
 
 @bot.command()
-async def autojoin_add(ctx: commands.Context):
+async def autojoin_on(ctx: commands.Context):
     """
     自分を自動入室対象に登録。
-    例: !autojoin_add
+    例: !autojoin_on
     """
     touch_work()
 
@@ -353,10 +353,10 @@ async def autojoin_add(ctx: commands.Context):
 
 
 @bot.command()
-async def autojoin_remove(ctx: commands.Context):
+async def autojoin_off(ctx: commands.Context):
     """
     自分を自動入室対象から解除。
-    例: !autojoin_remove
+    例: !autojoin_off
     """
     touch_work()
 

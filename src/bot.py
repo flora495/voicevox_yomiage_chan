@@ -235,6 +235,9 @@ async def unreadme(ctx: commands.Context):
 async def on_message(message: discord.Message):
     global last_activity
 
+    # 計測開始
+    start = time.perf_counter()
+
     # Bot自身やDMは無視
     if message.author.bot or message.guild is None:
         return
@@ -250,7 +253,6 @@ async def on_message(message: discord.Message):
         await bot.process_commands(message)
         return
 
-
     # ここまで来たら「読み上げ対象のメッセージ」
     touch_activity()
     await bot.process_commands(message)
@@ -263,15 +265,12 @@ async def on_message(message: discord.Message):
     if not text:
         return
 
-    # 必要なら長さ制限
     if len(text) > 100:
         text = text[:100] + " 以下略"
 
-    # ユーザ専用キャラ or サーバーデフォルト
     char_name = get_effective_speaker_name(message.guild.id, message.author.id)
     speaker_id = VOICEVOX_SPEAKERS.get(char_name, DEFAULT_SPEAKER_ID)
 
-    # 音声合成 → 一時wav
     wav_path = AUDIO_DIR / f"{message.id}.wav"
     try:
         tts_to_wav(text, wav_path, speaker_id)
@@ -279,21 +278,26 @@ async def on_message(message: discord.Message):
         print("VOICEVOXエラー:", e)
         return
 
-    # 再生キュー制御（前の再生が終わるまで待つ）
     while vc.is_playing() or vc.is_paused():
         await asyncio.sleep(0.1)
 
-    # ffmpegで再生
     source = discord.FFmpegPCMAudio(str(wav_path), **FFMPEG_OPTIONS)
     vc.play(source)
 
-    # 再生終了を待って削除
     while vc.is_playing():
         await asyncio.sleep(0.1)
     try:
         wav_path.unlink()
     except FileNotFoundError:
         pass
+
+    # 計測終了
+    end = time.perf_counter()
+    elapsed = end - start
+    print(
+        f"[TTS] guild={message.guild.id} user={message.author.id} "
+        f"len={len(message.content)} chars elapsed={elapsed:.3f} sec"
+    )
 
 
 @bot.event

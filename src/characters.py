@@ -1,24 +1,22 @@
-# characters.py
 from __future__ import annotations
 
 from typing import Literal, TypedDict, Dict, List
+from pathlib import Path
+import json
 
-# VOICEVOX 用
 import requests
-
-# A.I.VOICE 用
 from aivoice_python import AIVoiceTTsControl, HostStatus  # [web:312]
-
 
 Engine = Literal["voicevox", "aivoice"]
 
 
 class CharacterInfo(TypedDict):
     engine: Engine
-    speaker_id: str  # VOICEVOXは数値IDを文字列化, A.I.VOICEはプリセット名など
+    speaker_id: str          # VOICEVOX: 数値IDをstr化, A.I.VOICE: キャラ名そのもの
+    allowed_user_ids: List[int]
 
 
-# ===== 1. VOICEVOX の話者IDを動的取得 =====
+# ===== VOICEVOX: /speakers から動的に ID 解決 =====
 
 VOICEVOX_HOST = "localhost"
 VOICEVOX_PORT = 50021
@@ -33,12 +31,6 @@ def _voicevox_fetch_speakers():
 
 
 def _voicevox_build_name_to_id_map() -> Dict[str, int]:
-    """
-    VOICEVOXの /speakers 結果から、
-    「キャラ名（スタイル名省略） -> ノーマル系スタイルのid」
-    のマップを作る。
-    （元の wav.py と同じロジック）
-    """
     data = _voicevox_fetch_speakers()
     mapping: Dict[str, int] = {}
 
@@ -66,100 +58,95 @@ def _voicevox_build_name_to_id_map() -> Dict[str, int]:
     return mapping
 
 
-# ===== 2. A.I.VOICE のボイス名を取得 =====
+# ===== A.I.VOICE: 利用可能なプリセット名一覧（バリデーション用・任意） =====
 
-def _aivoice_get_voice_names() -> List[str]:
-    """
-    A.I.VOICE Editor から利用可能なボイス名リストを取得する。
-    （aivoice-python の README に基づく）[web:312]
-    """
+def _aivoice_get_voice_preset_names() -> List[str]:
     tts = AIVoiceTTsControl()
     host_names = tts.get_available_host_names()
     if not host_names:
         return []
 
     tts.initialize(host_names[0])
-
     if tts.status == HostStatus.NotRunning:
         tts.start_host()
-
     tts.connect()
-    voices = list(tts.voice_names)  # プリセット名とは別に必要なら voice_preset_names も使える[web:312]
+
+    names = list(tts.voice_preset_names)  # or voice_names[web:312]
     tts.disconnect()
-    return voices
+    return names
 
 
-# ===== 3. キャラクタ定義（キャラ名だけ固定、IDは起動時に埋める） =====
+# ===== JSON 読み込み & CHARACTER_MAP 構築 =====
 
-# ここに「Botで使いたいキャラ名」を並べる。
-# VOICEVOX用キャラ
-VOICEVOX_CHARACTER_NAMES = [
-    "ずんだもん",
-    "四国めたん",
-    "春日部つむぎ",
-    "東北きりたん",
-    "東北ずん子",
-    "中国うさぎ",
-    "あんこもん",
-]
-
-# A.I.VOICE用キャラ（実際の環境で存在する名前に合わせて調整）
-AIVOICE_CHARACTER_NAMES = [
-    "紲星 あかり"
-]
+CONF_PATH = Path("settings") / "characters_config.json"
 
 
-# Bot全体のデフォルトキャラ
-DEFAULT_CHARACTER_NAME = "ずんだもん"
+def _load_raw_config():
+    with CONF_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 
-def _build_character_map() -> Dict[str, CharacterInfo]:
+def _build_character_map() -> tuple[Dict[str, CharacterInfo], str]:
+    conf = _load_raw_config()
+    raw_chars: Dict[str, dict] = conf.get("characters", {})
+    default_name: str = conf.get("default_character", "")
+
     char_map: Dict[str, CharacterInfo] = {}
 
-    # --- VOICEVOX 側 ---
+    # VOICEVOX name -> id
     try:
         vv_name_to_id = _voicevox_build_name_to_id_map()
     except Exception as e:
         print("[WARN] VOICEVOX speakers の取得に失敗しました:", e)
         vv_name_to_id = {}
 
-    for name in VOICEVOX_CHARACTER_NAMES:
-        sid = vv_name_to_id.get(name)
-        if sid is None:
-            print(f"[WARN] VOICEVOX speaker '{name}' not found in /speakers")
-            continue
-        char_map[name] = {
-            "engine": "voicevox",
-            "speaker_id": str(sid),
-        }
-
-    # --- A.I.VOICE 側 ---
+    # A.I.VOICE のプリセット名一覧（存在チェック用・任意）
     try:
-        available_voices = set(_aivoice_get_voice_names())
+        aivoice_presets = set(_aivoice_get_voice_preset_names())
     except Exception as e:
-        print("[WARN] A.I.VOICE voice_names の取得に失敗しました:", e)
-        available_voices = set()
+        print("[WARN] A.I.VOICE voice_preset_names の取得に失敗しました:", e)
+        aivoice_presets = set()
 
-    for name in AIVOICE_CHARACTER_NAMES:
-        if name not in available_voices:
-            print(f"[WARN] A.I.VOICE voice '{name}' not found in voice_names")
+    for name, info in raw_chars.items():
+        engine: Engine = info["engine"]
+        allowed: List[int] = info.get("allowed_user_ids", [])
+
+        if engine == "voicevox":
+            sid = vv_name_to_id.get(name)
+            if sid is None:
+                print(f"[WARN] VOICEVOX speaker '{name}' not found in /speakers")
+                continue
+            char_map[name] = {
+                "engine": "voicevox",
+                "speaker_id": str(sid),
+                "allowed_user_ids": allowed,
+            }
+
+        elif engine == "aivoice":
+            # A.I.VOICE はキャラ名＝speaker_id として扱う
+            speaker_id = name
+            if aivoice_presets and speaker_id not in aivoice_presets:
+                print(f"[WARN] A.I.VOICE preset '{speaker_id}' not found in voice_preset_names")
+            char_map[name] = {
+                "engine": "aivoice",
+                "speaker_id": speaker_id,
+                "allowed_user_ids": allowed,
+            }
+
+        else:
+            print(f"[WARN] Unknown engine '{engine}' for character '{name}'")
             continue
-        # A.I.VOICE 側は「名前 = speaker_id」として扱う
-        char_map[name] = {
-            "engine": "aivoice",
-            "speaker_id": name,
-        }
 
-    # デフォルトキャラがマップに無ければ、適当に一つ目をデフォルト扱いにする
-    if DEFAULT_CHARACTER_NAME not in char_map and char_map:
-        any_name = next(iter(char_map.keys()))
+    # デフォルトキャラ補正
+    if default_name not in char_map and char_map:
+        fallback = next(iter(char_map.keys()))
         print(
-            f"[WARN] DEFAULT_CHARACTER_NAME '{DEFAULT_CHARACTER_NAME}' not in CHARACTER_MAP. "
-            f"Fallback to '{any_name}'."
+            f"[WARN] default_character '{default_name}' not in CHARACTER_MAP. "
+            f"Fallback to '{fallback}'."
         )
+        default_name = fallback
 
-    return char_map
+    return char_map, default_name
 
 
-# 起動時に一度だけ構築
-CHARACTER_MAP: Dict[str, CharacterInfo] = _build_character_map()
+CHARACTER_MAP, DEFAULT_CHARACTER_NAME = _build_character_map()

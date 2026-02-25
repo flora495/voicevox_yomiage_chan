@@ -24,6 +24,15 @@
 1. A.I.VOICE Editorを起動。
 1. `src/bot.py`を起動。
 
+## ファイル詳細
+### `token.json`
+API TOKEN保持ファイル。アップロードしないこと。
+### `user_preferences.json`
+ユーザーごとの設定を保持する。主に読み上げ対象かどうか、AUTOJOIN対象かどうか、どのキャラクターが設定されているか。
+### `characters_config.json`
+読み上げのキャラクターの属性。`"allowed_user_ids"`が空でないキャラクターはそこで指定されたユーザIDを持つユーザのみが`!speaker`で設定できます。必要であれば手動で変更すること。
+
+
 ## その他の機能とか
 1. どこのボイスチャットにも入っていない状態が一定時間続くとdiscord上でのステータスが自動でinvisibleになる。
 1. A.I.Voiceの登録済みキャラクター一覧を確認したい場合check_aivoice_characters.pyを実行せよ。

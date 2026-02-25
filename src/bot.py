@@ -247,41 +247,43 @@ async def disconnect(ctx: commands.Context):
 
 @bot.command()
 async def speaker(ctx: commands.Context, *, name: str | None = None):
-    """
-    自分のキャラ変更コマンド。単体ならキャラ一覧を表示。
-    例: !speaker ずんだもん
-        !speaker 紲星あかり
-    """
     touch_work()
 
     if name is None:
         lines = ["利用可能なキャラ一覧:"]
         for char_name, info in CHARACTER_MAP.items():
-            lines.append(f"- {char_name} [{info['engine']}]")
-        lines.append("キャラ変更の例↓")
-        lines.append(f"- {COMMAND_PREFIX}speaker ずんだもん")
+            allowed = info.get("allowed_user_ids") or []
+            if not allowed:
+                scope = "誰でも利用可"
+            else:
+                scope = f"許可ユーザーのみ ({len(allowed)}人)"
+            lines.append(f"- {char_name} [{info['engine']}] ({scope})")
         await ctx.send("\n".join(lines))
         return
 
-    # ユーザー入力を正規化
-    normalized = normalize_char_name(name)
+    name = name.strip()
+    # 正規化しているならここで normalize_char_name(name) → NORMALIZED_CHARACTER_MAP を使う
 
-    # 正規化マップから本来のキーを引く
-    original_name = NORMALIZED_CHARACTER_MAP.get(normalized)
-    if original_name is None:
+    if name not in CHARACTER_MAP:
         valid = ", ".join(CHARACTER_MAP.keys())
+        await ctx.send(f"知らないキャラです。使える名前: {valid}")
+        return
+
+    info = CHARACTER_MAP[name]
+    allowed_ids = info.get("allowed_user_ids") or []
+    if allowed_ids and ctx.author.id not in allowed_ids:
         await ctx.send(
-            "知らないキャラです。使える名前: "
-            + valid
+            f"「{name}」は利用可能なユーザーが制限されています。"
+            "このキャラはあなたのアカウントでは使用できません。"
         )
         return
 
     uid_str = str(ctx.author.id)
-    user_speakers_name[uid_str] = original_name
+    user_speakers_name[uid_str] = name
     save_user_preferences()
 
     await ctx.send(
-        f"{ctx.author.display_name} さんの読み上げキャラを「{original_name}」に変更しました。"
+        f"{ctx.author.display_name} さんの読み上げキャラを「{name}」に変更しました。"
     )
 
 

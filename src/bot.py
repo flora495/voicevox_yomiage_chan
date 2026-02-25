@@ -1,4 +1,16 @@
 # bot.py
+
+#################################################################
+#　　　　　　　　　　 ∧＿∧
+#　　　　　 ∧＿∧ 　（´<_｀ ）　 Welcome to My Coding Space!
+#　　　　 （ ´_ゝ`）　/　 ⌒i
+#　　　　／　　　＼　 　  |　|
+#　　　 /　　 /￣￣￣￣/　　|
+#　 ＿_(__ﾆつ/　    ＿/ .| .|＿＿＿＿
+#　 　　　＼/＿＿＿＿/　（u　⊃
+#################################################################
+
+
 import json
 import asyncio
 import time
@@ -9,7 +21,7 @@ from io import BytesIO
 import discord
 from discord.ext import commands
 
-from wav import tts_to_wav_bytes, build_speaker_name_to_id_map
+from wav import tts_to_wav_bytes, get_voicevox_speakers
 
 # ===== パス・設定ファイル読み込み =====
 COMMAND_PREFIX = "!"
@@ -17,7 +29,7 @@ COMMAND_PREFIX = "!"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 TOKEN_PATH = PROJECT_ROOT / "settings" / "token.json"
-USER_PREFS_PATH = PROJECT_ROOT / "settings" / "user_prefs.json"
+USER_PREFS_PATH = PROJECT_ROOT / "settings" / "user_preferences.json"
 
 # token.json からトークンを読む
 with TOKEN_PATH.open("r", encoding="utf-8") as f:
@@ -36,8 +48,8 @@ AUTOJOIN_USER_IDS = set(user_prefs.get("AUTOJOIN_USER_IDS", []))      # 自動�
 user_speakers_name: dict[str, str] = user_prefs.get("USER_SPEAKERS", {})  # user_id(str) -> キャラ名
 
 
-def save_user_prefs():
-    """user_prefs.json に現在の設定を書き戻す。"""
+def save_user_preferences():
+    """user_preferences.json に現在の設定を書き戻す。"""
     data = {
         "TARGET_USER_IDS": list(TARGET_USER_IDS),
         "AUTOJOIN_USER_IDS": list(AUTOJOIN_USER_IDS),
@@ -47,23 +59,6 @@ def save_user_prefs():
     with USER_PREFS_PATH.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-
-# ===== VOICEVOX 話者設定（/speakers から動的取得） =====
-
-def get_voicevox_speakers(names: list[str]) -> dict[str, int]:
-    """
-    /speakers から話者一覧を取得し、names に含まれるキャラ名だけ
-    「キャラ名 -> ノーマル系 style.id」の dict で返す。
-    """
-    speaker_map = build_speaker_name_to_id_map()
-    result: dict[str, int] = {}
-    for name in names:
-        sid = speaker_map.get(name)
-        if sid is not None:
-            result[name] = sid
-        else:
-            print(f"[WARN] VOICEVOX speaker '{name}' not found in /speakers")
-    return result
 
 
 # 対象キャラクターを登録
@@ -291,7 +286,7 @@ async def speaker(ctx: commands.Context, name: str | None = None):
 
     uid_str = str(ctx.author.id)
     user_speakers_name[uid_str] = name
-    save_user_prefs()
+    save_user_preferences()
 
     speaker_id = VOICEVOX_SPEAKERS[name]
     await ctx.send(
@@ -310,7 +305,7 @@ async def readme(ctx: commands.Context):
         return
 
     TARGET_USER_IDS.add(uid)
-    save_user_prefs()
+    save_user_preferences()
 
     await ctx.send(f"{ctx.author.display_name} さんを読み上げ対象に追加しました。")
 
@@ -326,7 +321,7 @@ async def unreadme(ctx: commands.Context):
         return
 
     TARGET_USER_IDS.remove(uid)
-    save_user_prefs()
+    save_user_preferences()
 
     await ctx.send(f"{ctx.author.display_name} さんを読み上げ対象から削除しました。")
 
@@ -347,7 +342,7 @@ async def autojoin_on(ctx: commands.Context):
         return
 
     AUTOJOIN_USER_IDS.add(uid)
-    save_user_prefs()
+    save_user_preferences()
 
     await ctx.send(f"{target.display_name} さんを自動入室対象に追加しました。")
 
@@ -368,7 +363,7 @@ async def autojoin_off(ctx: commands.Context):
         return
 
     AUTOJOIN_USER_IDS.remove(uid)
-    save_user_prefs()
+    save_user_preferences()
 
     await ctx.send(f"{target.display_name} さんを自動入室対象から削除しました。")
 

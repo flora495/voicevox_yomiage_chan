@@ -4,11 +4,11 @@ import asyncio
 import time
 from collections import defaultdict
 from pathlib import Path
-
+from io import BytesIO
 import discord
 from discord.ext import commands
 
-from wav import tts_to_wav
+from wav import tts_to_wav_bytes
 
 # ===== パス・設定ファイル読み込み =====
 COMMAND_PREFIX = "!"
@@ -265,31 +265,39 @@ async def on_message(message: discord.Message):
     if not text:
         return
 
+    # 必要なら長さ制限
     if len(text) > 100:
         text = text[:100] + " 以下略"
 
+    # ユーザ専用キャラ or サーバーデフォルト
     char_name = get_effective_speaker_name(message.guild.id, message.author.id)
     speaker_id = VOICEVOX_SPEAKERS.get(char_name, DEFAULT_SPEAKER_ID)
 
-    wav_path = AUDIO_DIR / f"{message.id}.wav"
+    # 音声合成（メモリ上に bytes で取得）
     try:
-        tts_to_wav(text, wav_path, speaker_id)
+        # CPUブロッキングを避けたければ asyncio.to_thread でもよい
+        # wav_bytes = await asyncio.to_thread(tts_to_wav_bytes, text, speaker_id)
+        wav_bytes = tts_to_wav_bytes(text, speaker_id)
     except Exception as e:
         print("VOICEVOXエラー:", e)
         return
 
+    # 再生キュー制御（前の再生が終わるまで待つ）
     while vc.is_playing() or vc.is_paused():
         await asyncio.sleep(0.1)
 
-    source = discord.FFmpegPCMAudio(str(wav_path), **FFMPEG_OPTIONS)
+    # メモリ上の WAV を ffmpeg に渡して再生
+    wav_buf = BytesIO(wav_bytes)
+    source = discord.FFmpegPCMAudio(
+        wav_buf,
+        pipe=True,
+        **FFMPEG_OPTIONS,
+    )
     vc.play(source)
 
+    # 再生終了を待つ
     while vc.is_playing():
         await asyncio.sleep(0.1)
-    try:
-        wav_path.unlink()
-    except FileNotFoundError:
-        pass
 
     # 計測終了
     end = time.perf_counter()

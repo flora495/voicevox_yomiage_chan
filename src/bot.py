@@ -249,8 +249,9 @@ async def disconnect(ctx: commands.Context):
 async def speaker(ctx: commands.Context, *, name: str | None = None):
     touch_work()
 
-    if name is None:
-        lines = ["利用可能なキャラ一覧:"]
+    # 共通の一覧整形ロジック
+    def build_character_list_header(prefix: str) -> str:
+        lines = [prefix]
         for char_name, info in CHARACTER_MAP.items():
             allowed = info.get("allowed_user_ids") or []
             if not allowed:
@@ -258,34 +259,41 @@ async def speaker(ctx: commands.Context, *, name: str | None = None):
             else:
                 scope = f"許可ユーザーのみ ({len(allowed)}人)"
             lines.append(f"- {char_name} [{info['engine']}] ({scope})")
-        await ctx.send("\n".join(lines))
+        return "\n".join(lines)
+
+    # name 未指定なら一覧表示
+    if name is None:
+        msg = build_character_list_header("利用可能なキャラ一覧:")
+        await ctx.send(msg)
         return
 
-    name = name.strip()
-    # 正規化しているならここで normalize_char_name(name) → NORMALIZED_CHARACTER_MAP を使う
+    # 入力を正規化して照合
+    normalized = normalize_char_name(name)
+    original_name = NORMALIZED_CHARACTER_MAP.get(normalized)
 
-    if name not in CHARACTER_MAP:
-        valid = ", ".join(CHARACTER_MAP.keys())
-        await ctx.send(f"知らないキャラです。使える名前: {valid}")
+    if original_name is None:
+        # 不明なキャラ名 → 一覧付きエラーメッセージ
+        msg = build_character_list_header("知らないキャラです。\n利用可能なキャラ一覧:")
+        await ctx.send(msg)
         return
 
-    info = CHARACTER_MAP[name]
+    info = CHARACTER_MAP[original_name]
     allowed_ids = info.get("allowed_user_ids") or []
     if allowed_ids and ctx.author.id not in allowed_ids:
         await ctx.send(
-            f"「{name}」は利用可能なユーザーが制限されています。"
+            f"「{original_name}」は利用可能なユーザーが制限されています。"
             "このキャラはあなたのアカウントでは使用できません。"
         )
         return
 
     uid_str = str(ctx.author.id)
-    user_speakers_name[uid_str] = name
+    user_speakers_name[uid_str] = original_name
     save_user_preferences()
 
     await ctx.send(
-        f"{ctx.author.display_name} さんの読み上げキャラを「{name}」に変更しました。"
+        f"{ctx.author.display_name} さんの読み上げキャラを「{original_name}」に変更しました。"
     )
-
+    
 
 @bot.command()
 async def readme(ctx: commands.Context):

@@ -9,7 +9,7 @@ PORT = 50021
 
 # ① セッションをグローバルに 1 個だけ作る
 session = requests.Session()
-SPEEDSCALE=1.1            # 1.0 が標準、1.1〜1.2 くらいで様子見
+SPEEDSCALE=1.05            # 1.0 が標準、1.1〜1.2 くらいで様子見
 PREPHONEMELENGTH = 0.0    # 発話前の無音
 POSTHONEMELENGTH = 0.0   # 発話後の無音
 
@@ -31,7 +31,18 @@ def tts_to_wav(text: str, out_path: Path, speaker_id: int) -> Path:
     # 話速を少し早く（例: 1.1倍）、前後の無音を削る
     query["speedScale"] = SPEEDSCALE
     query["prePhonemeLength"] = PREPHONEMELENGTH
-    query["postPhonemeLength"] = POSTHONEMELENGTH
+    #query["postPhonemeLength"] = POSTHONEMELENGTH
+    
+    end = text[-1] if text else ""
+    if end in "。．.!！?？":
+        # 文末: 少し長め
+        query["postPhonemeLength"] = 0.25  # デフォルトより長く
+    elif end in "、,，":
+        # 読点: ちょっとだけ
+        query["postPhonemeLength"] = 0.2
+    else:
+        # それ以外: 短め
+        query["postPhonemeLength"] = 0.05
 
     # 2. 合成してwav取得（こちらも session を使う）
     s = session.post(
@@ -57,7 +68,18 @@ def tts_to_wav_bytes(text: str, speaker_id: int) -> bytes:
     query = q.json()
     query["speedScale"] = SPEEDSCALE
     query["prePhonemeLength"] = PREPHONEMELENGTH
-    query["postPhonemeLength"] = POSTHONEMELENGTH
+    #query["postPhonemeLength"] = POSTHONEMELENGTH
+    
+    end = text[-1] if text else ""
+    if end in "。．.!！?？":
+        # 文末: 少し長め
+        query["postPhonemeLength"] = 0.25  # デフォルトより長く
+    elif end in "、,，":
+        # 読点: ちょっとだけ
+        query["postPhonemeLength"] = 0.2
+    else:
+        # それ以外: 短め
+        query["postPhonemeLength"] = 0.05
 
     s = session.post(
         f"http://{HOST}:{PORT}/synthesis",

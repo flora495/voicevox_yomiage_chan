@@ -5,6 +5,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 from io import BytesIO
+
 import discord
 from discord.ext import commands
 
@@ -46,10 +47,7 @@ if USER_SPEAKERS_PATH.exists():
 else:
     user_speakers_name: dict[str, str] = {}
 
-# 一時wav保存先（プロジェクトルート基準）
-AUDIO_DIR = PROJECT_ROOT / "audio_cache"
-
-# ffmpeg オプション（PATHにffmpegが通っている前提）
+# ffmpeg オプション
 FFMPEG_OPTIONS = {
     "before_options": "-loglevel panic",
     "options": "-vn",
@@ -57,13 +55,74 @@ FFMPEG_OPTIONS = {
 
 # ===== 非アクティブ監視用 =====
 
-INACTIVE_TIMEOUT = 60 * 60  # 60*60秒=60分
+INACTIVE_TIMEOUT = 60 * 60  # 60分
 last_activity = time.time()
 
 
 def touch_activity():
     global last_activity
     last_activity = time.time()
+
+
+# ===== 文分割ヘルパ =====
+
+def split_into_sentences(text: str) -> list[str]:
+    """
+    簡易な文分割: 「。」「！」「？」などで区切る。
+    区切り記号も文末に残す。
+    """
+    seps = "。！？!?、,．." 
+    sentences = []
+    buf = ""
+
+    for ch in text:
+        buf += ch
+        if ch in seps:
+            s = buf.strip()
+            if s:
+                sentences.append(s)
+            buf = ""
+
+    tail = buf.strip()
+    if tail:
+        sentences.append(tail)
+
+    return sentences
+
+
+# ===== 再生キュー =====
+# (guild_id, wav_bytes, message_id, sentence_index)
+play_queue: asyncio.Queue[tuple[int, bytes, int, int]] = asyncio.Queue()
+
+
+async def player_task():
+    """キューから音声を取り出して順番に再生するタスク。"""
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        guild_id, wav_bytes, msg_id, idx = await play_queue.get()
+
+        guild = bot.get_guild(guild_id)
+        if guild is None:
+            continue
+        vc = guild.voice_client
+        if vc is None or not vc.is_connected():
+            continue
+
+        # 前の再生が終わるのを待つ
+        while vc.is_playing() or vc.is_paused():
+            await asyncio.sleep(0.1)
+
+        wav_buf = BytesIO(wav_bytes)
+        source = discord.FFmpegPCMAudio(
+            wav_buf,
+            pipe=True,
+            **FFMPEG_OPTIONS,
+        )
+        vc.play(source)
+
+        # 再生終了を待つ
+        while vc.is_playing():
+            await asyncio.sleep(0.1)
 
 
 # ===== Discord Bot 初期化 =====
@@ -85,10 +144,6 @@ def get_guild_speaker_id(guild_id: int) -> int:
 
 
 def get_effective_speaker_name(guild_id: int, user_id: int) -> str:
-    """
-    ユーザ専用キャラがあればそれを優先し、
-    なければサーバー共通のデフォルトキャラを返す。
-    """
     uid_str = str(user_id)
     if uid_str in user_speakers_name:
         return user_speakers_name[uid_str]
@@ -105,12 +160,14 @@ async def inactivity_watcher():
             break
         await asyncio.sleep(60)
 
+
 # ===== イベント・コマンド =====
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
     bot.loop.create_task(inactivity_watcher())
+    bot.loop.create_task(player_task())
 
 
 @bot.command()
@@ -128,7 +185,6 @@ async def join(ctx: commands.Context):
     else:
         await ctx.voice_client.move_to(channel)
 
-    # join を呼んだ人のキャラ名（なければサーバーデフォルト）
     char_name = get_effective_speaker_name(ctx.guild.id, ctx.author.id)
     bot_name = bot.user.display_name if bot.user else "読み上げBot"
     await ctx.send(f"{bot_name}（{char_name}）が「{channel.name}」に接続しました。")
@@ -153,21 +209,15 @@ async def speaker(ctx: commands.Context, name: str | None = None):
     """
     touch_activity()
 
-    # 引数なし → 一覧表示
     if name is None:
         lines = ["利用可能なキャラ一覧:"]
         for char_name, sid in VOICEVOX_SPEAKERS.items():
             lines.append(f"- {char_name}（ID: {sid}）")
-
-        # 使い方サンプルを追記
         lines.append("キャラ変更の例↓")
         lines.append(f"- {COMMAND_PREFIX}speaker ずんだもん")
-
         await ctx.send("\n".join(lines))
         return
 
-
-    # ここからは変更処理
     name = name.strip()
 
     if name not in VOICEVOX_SPEAKERS:
@@ -188,13 +238,9 @@ async def speaker(ctx: commands.Context, name: str | None = None):
     )
 
 
-
 @bot.command()
 async def readme(ctx: commands.Context):
-    """
-    自分を読み上げ対象に登録:
-    例: !readme
-    """
+    """自分を読み上げ対象に登録"""
     uid = ctx.author.id
     if uid in TARGET_USER_IDS:
         await ctx.send(f"{ctx.author.display_name} さんは既に読み上げ対象です。")
@@ -202,7 +248,6 @@ async def readme(ctx: commands.Context):
 
     TARGET_USER_IDS.add(uid)
 
-    # pass.json へ反映
     pass_conf["TARGET_USER_IDS"] = list(TARGET_USER_IDS)
     with PASS_PATH.open("w", encoding="utf-8") as f:
         json.dump(pass_conf, f, ensure_ascii=False, indent=2)
@@ -212,10 +257,7 @@ async def readme(ctx: commands.Context):
 
 @bot.command()
 async def unreadme(ctx: commands.Context):
-    """
-    自分を読み上げ対象から外す:
-    例: !unreadme
-    """
+    """自分を読み上げ対象から外す"""
     uid = ctx.author.id
     if uid not in TARGET_USER_IDS:
         await ctx.send(f"{ctx.author.display_name} さんは元々読み上げ対象ではありません。")
@@ -230,12 +272,11 @@ async def unreadme(ctx: commands.Context):
     await ctx.send(f"{ctx.author.display_name} さんを読み上げ対象から削除しました。")
 
 
-
 @bot.event
 async def on_message(message: discord.Message):
     global last_activity
 
-    # 計測開始
+    # 計測開始（テキスト受信→合成完了まで）
     start = time.perf_counter()
 
     # Bot自身やDMは無視
@@ -265,46 +306,48 @@ async def on_message(message: discord.Message):
     if not text:
         return
 
-    # 必要なら長さ制限
+    # 必要なら長さ制限（全体）
     if len(text) > 100:
         text = text[:100] + " 以下略"
 
-    # ユーザ専用キャラ or サーバーデフォルト
+    # 文に分割
+    sentences = split_into_sentences(text)
+    if not sentences:
+        return
+
     char_name = get_effective_speaker_name(message.guild.id, message.author.id)
     speaker_id = VOICEVOX_SPEAKERS.get(char_name, DEFAULT_SPEAKER_ID)
 
-    # 音声合成（メモリ上に bytes で取得）
-    try:
-        # CPUブロッキングを避けたければ asyncio.to_thread でもよい
-        # wav_bytes = await asyncio.to_thread(tts_to_wav_bytes, text, speaker_id)
-        wav_bytes = tts_to_wav_bytes(text, speaker_id)
-    except Exception as e:
-        print("VOICEVOXエラー:", e)
+    # 文ごとに並列で合成
+    tasks = []
+    for idx, sent in enumerate(sentences):
+        task = asyncio.to_thread(tts_to_wav_bytes, sent, speaker_id)
+        tasks.append((idx, task))
+
+    results: list[tuple[int, bytes]] = []
+    for idx, task in tasks:
+        try:
+            wav_bytes = await task
+        except Exception as e:
+            print(f"VOICEVOXエラー (sentence {idx}):", e)
+            continue
+        results.append((idx, wav_bytes))
+
+    if not results:
         return
 
-    # 再生キュー制御（前の再生が終わるまで待つ）
-    while vc.is_playing() or vc.is_paused():
-        await asyncio.sleep(0.1)
+    # 文の順番で並べ替えてキューに積む
+    results.sort(key=lambda x: x[0])
 
-    # メモリ上の WAV を ffmpeg に渡して再生
-    wav_buf = BytesIO(wav_bytes)
-    source = discord.FFmpegPCMAudio(
-        wav_buf,
-        pipe=True,
-        **FFMPEG_OPTIONS,
-    )
-    vc.play(source)
+    for idx, wav_bytes in results:
+        await play_queue.put((message.guild.id, wav_bytes, message.id, idx))
 
-    # 再生終了を待つ
-    while vc.is_playing():
-        await asyncio.sleep(0.1)
-
-    # 計測終了
     end = time.perf_counter()
     elapsed = end - start
     print(
-        f"[TTS] guild={message.guild.id} user={message.author.id} "
-        f"len={len(message.content)} chars elapsed={elapsed:.3f} sec"
+        f"[TTS queued-sent] guild={message.guild.id} user={message.author.id} "
+        f"len={len(message.content)} chars "
+        f"sentences={len(sentences)} synth_elapsed_total={elapsed:.3f} sec"
     )
 
 
@@ -313,24 +356,18 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
     """
     人間が全員抜けてBotだけになったら、自動でVCから切断する。
     """
-    # BotがそのギルドでVCに接続しているか確認
     voice_client = member.guild.voice_client
     if voice_client is None or voice_client.channel is None:
         return
 
     channel = voice_client.channel
 
-    # 対象のVCにメンバーが変化したイベントでなければ無視
     if before.channel is not channel and after.channel is not channel:
         return
 
-    # 今そのVCにいるメンバーを取得
     members = channel.members
-
-    # Bot以外の人間がいるかチェック
     humans = [m for m in members if not m.bot]
 
-    # 人間が0人 → Botだけ → 切断
     if len(humans) == 0:
         await voice_client.disconnect()
 

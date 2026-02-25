@@ -37,3 +37,5 @@
 ## 開発者向け
 [README_DEV.md](./README_DEV.md)
 
+## License
+MIT License.

@@ -26,13 +26,55 @@
 
 ## 設定ファイル詳細
 ### `token.json`
+```
+{
+  "DISCORD_TOKEN": "ここにBotのトークン文字列"
+}
+```
 API TOKEN保持ファイル。Githubにアップロードしないこと。
 ### `user_preferences.json`
+```
+{
+  "TARGET_USER_IDS": [
+    111111111111111111,
+    222222222222222222
+  ],
+  "AUTOJOIN_USER_IDS": [
+    111111111111111111
+  ],
+  "USER_SPEAKERS": {
+    "111111111111111111": "ずんだもん",
+    "222222222222222222": "紲星 あかり"
+  }
+}
+```
 ユーザーごとの設定を保持する。主に読み上げ対象かどうか、AUTOJOIN対象かどうか、どのキャラクターが設定されているか。
 ### `characters_config.json`
+```
+{
+  "characters": {
+    "ずんだもん": {
+      "engine": "voicevox",
+      "allowed_user_ids": []
+    },
+    "四国めたん": {
+      "engine": "voicevox",
+      "allowed_user_ids": []
+    },
+    "紲星 あかり": {
+      "engine": "aivoice",
+      "allowed_user_ids": [
+        111111111111111111
+      ]
+    }
+  },
+  "default_character": "ずんだもん"
+}
+
+```
 読み上げのキャラクターの属性。`"allowed_user_ids"`が空でないキャラクターはそこで指定されたユーザIDを持つユーザのみが`!speaker`で設定できます。必要であれば手動で変更すること。
 <br>
-また、新しいキャラクターを追加する際はここに追加するだけで良い。
+また、新しいキャラクターを追加する際はここに追加するだけで可能です。
 
 
 ## その他の機能とか

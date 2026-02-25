@@ -369,6 +369,42 @@ async def autojoin_off(ctx: commands.Context):
     await ctx.send(f"{target.display_name} さんを自動入室対象から削除しました。")
 
 
+@bot.command()
+async def casts(ctx: commands.Context):
+    """
+    現在のサーバーで読み上げ対象になっている人と、そのキャラクターを表示する。
+    例: !casts
+    """
+    touch_work()
+
+    guild = ctx.guild
+    if guild is None:
+        await ctx.send("サーバー内で実行してください。")
+        return
+
+    # ギルドメンバーの ID -> Member オブジェクト のテーブル
+    members_by_id = {m.id: m for m in guild.members}
+
+    lines: list[str] = []
+    for uid in TARGET_USER_IDS:
+        member = members_by_id.get(uid)
+        if member is None:
+            # いまこのギルドにいないユーザーはスキップ
+            continue
+
+        display_name = member.display_name
+        char_name = get_effective_character_name(guild.id, uid)
+        lines.append(f"- {display_name} さん: {char_name}")
+
+    if not lines:
+        await ctx.send("このサーバーで読み上げ対象になっている人はいません。")
+        return
+
+    header = "読み上げ対象になっている人一覧:"
+    await ctx.send("\n".join([header, *lines]))
+
+
+
 @bot.event
 async def on_message(message: discord.Message):
     global last_work_time

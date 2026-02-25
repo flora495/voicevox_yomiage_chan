@@ -1,15 +1,4 @@
 # bot.py
-
-#################################################################
-#　　　　　　　　　　 ∧＿∧
-#　　　　　 ∧＿∧ 　（´<_｀ ）　 Welcome to My Coding Space!
-#　　　　 （ ´_ゝ`）　/　 ⌒i
-#　　　　／　　　＼　 　  |　|
-#　　　 /　　 /￣￣￣￣/　　|
-#　 ＿_(__ﾆつ/　    ＿/ .| .|＿＿＿＿
-#　 　　　＼/＿＿＿＿/　（u　⊃
-#################################################################
-
 import json
 import asyncio
 import time
@@ -20,7 +9,7 @@ from io import BytesIO
 import discord
 from discord.ext import commands
 
-from wav import tts_to_wav_bytes, get_voicevox_speakers
+from wav import tts_to_wav_bytes, build_speaker_name_to_id_map
 
 # ===== パス・設定ファイル読み込み =====
 COMMAND_PREFIX = "!"
@@ -28,7 +17,7 @@ COMMAND_PREFIX = "!"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 TOKEN_PATH = PROJECT_ROOT / "settings" / "token.json"
-USER_PREFS_PATH = PROJECT_ROOT / "settings" / "user_preferences.json"
+USER_PREFS_PATH = PROJECT_ROOT / "settings" / "user_prefs.json"
 
 # token.json からトークンを読む
 with TOKEN_PATH.open("r", encoding="utf-8") as f:
@@ -58,16 +47,50 @@ def save_user_prefs():
     with USER_PREFS_PATH.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-#対象キャラクターを以下に登録する
-VOICEVOX_SPEAKERS=get_voicevox_speakers(["ずんだもん","四国めたん","春日部つむぎ","東北きりたん","東北ずん子","中国うさぎ","あんこもん"])
 
-# デフォルトキャラ
+# ===== VOICEVOX 話者設定（/speakers から動的取得） =====
+
+def get_voicevox_speakers(names: list[str]) -> dict[str, int]:
+    """
+    /speakers から話者一覧を取得し、names に含まれるキャラ名だけ
+    「キャラ名 -> ノーマル系 style.id」の dict で返す。
+    """
+    speaker_map = build_speaker_name_to_id_map()
+    result: dict[str, int] = {}
+    for name in names:
+        sid = speaker_map.get(name)
+        if sid is not None:
+            result[name] = sid
+        else:
+            print(f"[WARN] VOICEVOX speaker '{name}' not found in /speakers")
+    return result
+
+
+# 対象キャラクターを登録
+VOICEVOX_SPEAKERS = get_voicevox_speakers(
+    ["ずんだもん", "四国めたん", "春日部つむぎ", "東北きりたん", "東北ずん子", "中国うさぎ", "あんこもん"]
+)
+
+# デフォルトキャラ名
 DEFAULT_SPEAKER_NAME = "ずんだもん"
-DEFAULT_SPEAKER_ID = VOICEVOX_SPEAKERS[DEFAULT_SPEAKER_NAME]
+
+# VOICEVOX_SPEAKERS からデフォルトIDを決定（ベタ書きIDを排除）
+if DEFAULT_SPEAKER_NAME in VOICEVOX_SPEAKERS:
+    DEFAULT_SPEAKER_ID = VOICEVOX_SPEAKERS[DEFAULT_SPEAKER_NAME]
+else:
+    if VOICEVOX_SPEAKERS:
+        DEFAULT_SPEAKER_NAME, DEFAULT_SPEAKER_ID = next(iter(VOICEVOX_SPEAKERS.items()))
+        print(
+            f"[WARN] DEFAULT_SPEAKER_NAME not found in VOICEVOX_SPEAKERS. "
+            f"Fallback to {DEFAULT_SPEAKER_NAME} (ID: {DEFAULT_SPEAKER_ID})"
+        )
+    else:
+        raise RuntimeError("VOICEVOX_SPEAKERS が空です。指定キャラが /speakers に見つかりません。")
 
 # ギルドごとの現在話者ID・名前（サーバーのデフォルトキャラ）
 guild_speakers_id: dict[int, int] = defaultdict(lambda: DEFAULT_SPEAKER_ID)
 guild_speakers_name: dict[int, str] = defaultdict(lambda: DEFAULT_SPEAKER_NAME)
+
 
 # ffmpeg オプション
 FFMPEG_OPTIONS = {
@@ -76,21 +99,16 @@ FFMPEG_OPTIONS = {
 }
 
 # ===== 非アクティブ監視用 =====
-VC_IDLE_TIMEOUT = 30 * 60  # 30分（どのVCにも入っていない状態が続いたら invisible）
+# 「最後に仕事（VC入室 or コマンド/読み上げ処理）してからの時間」で判定する
+IDLE_TIMEOUT = 30 * 60  # 30分
 
-last_activity = time.time()
-last_in_vc_time = time.time()  # 最後にどこかのVCにいた時刻
-
-
-def touch_activity():
-    global last_activity
-    last_activity = time.time()
+last_work_time = time.time()  # 最後に「仕事」した時刻
 
 
-def touch_in_vc():
-    """ボイスチャットに入った / まだ入っているときに呼ぶ。"""
-    global last_in_vc_time
-    last_in_vc_time = time.time()
+def touch_work():
+    """Bot が何か仕事をしたときに呼ぶ。"""
+    global last_work_time
+    last_work_time = time.time()
 
 
 # ===== 文分割ヘルパ =====
@@ -182,32 +200,27 @@ def get_effective_speaker_name(guild_id: int, user_id: int) -> str:
 
 async def inactivity_watcher():
     """
-    Bot がどのVCにも入っていない状態が 30分 続いたら、ステータスを invisible にする。
-    プログラムは終了しない。
+    最後に「仕事」(VC入室 or コマンド/メッセージ処理)をしてから
+    一定時間(IDLE_TIMEOUT)が経過したら、ステータスを invisible に。
+    仕事中は online。
     """
     await bot.wait_until_ready()
     while not bot.is_closed():
         now = time.time()
+        dt = now - last_work_time
 
-        # Bot がどこかのVCにいるか
-        in_any_vc = any(vc.is_connected() for vc in bot.voice_clients)
-
-        if in_any_vc:
-            # VC にいる間は「最後にVCにいた時刻」を更新 & ステータスをオンラインに戻す
-            touch_in_vc()
+        if dt <= IDLE_TIMEOUT:
+            # 最近仕事した → online にしておく
             try:
                 await bot.change_presence(status=discord.Status.online)
             except Exception as e:
                 print("change_presence (online) error:", e)
         else:
-            # どのVCにもいない状態が続いているか
-            if now - last_in_vc_time > VC_IDLE_TIMEOUT:
-                try:
-                    await bot.change_presence(status=discord.Status.invisible)
-                    print("No VC for 30 minutes. Changed presence to invisible.")
-                except Exception as e:
-                    print("change_presence (invisible) error:", e)
-                # invisible にしたあともループは続けておく
+            # 一定時間仕事していない → invisible
+            try:
+                await bot.change_presence(status=discord.Status.invisible)
+            except Exception as e:
+                print("change_presence (invisible) error:", e)
 
         await asyncio.sleep(60)
 
@@ -224,7 +237,7 @@ async def on_ready():
 @bot.command()
 async def join(ctx: commands.Context):
     """呼び出した人のVCに参加"""
-    touch_activity()
+    touch_work()
 
     if ctx.author.voice is None:
         await ctx.send("ボイスチャンネルに参加してから実行してね。")
@@ -236,8 +249,6 @@ async def join(ctx: commands.Context):
     else:
         await ctx.voice_client.move_to(channel)
 
-    touch_in_vc()  # VC に入ったので更新
-
     char_name = get_effective_speaker_name(ctx.guild.id, ctx.author.id)
     bot_name = bot.user.display_name if bot.user else "読み上げBot"
     await ctx.send(f"{bot_name}（{char_name}）が「{channel.name}」に接続しました。")
@@ -246,7 +257,7 @@ async def join(ctx: commands.Context):
 @bot.command()
 async def disconnect(ctx: commands.Context):
     """VCから切断"""
-    touch_activity()
+    touch_work()
 
     if ctx.voice_client is not None:
         await ctx.voice_client.disconnect()
@@ -260,7 +271,7 @@ async def speaker(ctx: commands.Context, name: str | None = None):
     例: !speaker ずんだもん
         !speaker   （キャラ一覧を表示）
     """
-    touch_activity()
+    touch_work()
 
     if name is None:
         lines = ["利用可能なキャラ一覧:"]
@@ -291,7 +302,7 @@ async def speaker(ctx: commands.Context, name: str | None = None):
 @bot.command()
 async def readme(ctx: commands.Context):
     """自分を読み上げ対象に登録"""
-    touch_activity()
+    touch_work()
 
     uid = ctx.author.id
     if uid in TARGET_USER_IDS:
@@ -307,7 +318,7 @@ async def readme(ctx: commands.Context):
 @bot.command()
 async def unreadme(ctx: commands.Context):
     """自分を読み上げ対象から外す"""
-    touch_activity()
+    touch_work()
 
     uid = ctx.author.id
     if uid not in TARGET_USER_IDS:
@@ -321,12 +332,12 @@ async def unreadme(ctx: commands.Context):
 
 
 @bot.command()
-async def autojoin_on(ctx: commands.Context):
+async def autojoin_add(ctx: commands.Context):
     """
     自分を自動入室対象に登録。
-    例: !autojoin_on
+    例: !autojoin_add
     """
-    touch_activity()
+    touch_work()
 
     target = ctx.author
     uid = target.id
@@ -342,12 +353,12 @@ async def autojoin_on(ctx: commands.Context):
 
 
 @bot.command()
-async def autojoin_off(ctx: commands.Context):
+async def autojoin_remove(ctx: commands.Context):
     """
     自分を自動入室対象から解除。
-    例: !autojoin_off
+    例: !autojoin_remove
     """
-    touch_activity()
+    touch_work()
 
     target = ctx.author
     uid = target.id
@@ -364,7 +375,7 @@ async def autojoin_off(ctx: commands.Context):
 
 @bot.event
 async def on_message(message: discord.Message):
-    global last_activity
+    global last_work_time
 
     # 計測開始（テキスト受信→合成完了まで）
     start = time.perf_counter()
@@ -375,7 +386,7 @@ async def on_message(message: discord.Message):
 
     # コマンドは読み上げ対象外
     if message.content.startswith(COMMAND_PREFIX):
-        touch_activity()
+        touch_work()  # 仕事したとみなす
         await bot.process_commands(message)
         return
 
@@ -385,7 +396,7 @@ async def on_message(message: discord.Message):
         return
 
     # ここまで来たら「読み上げ対象のメッセージ」
-    touch_activity()
+    touch_work()
     await bot.process_commands(message)
 
     vc = message.guild.voice_client
@@ -456,7 +467,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
             if voice_client is None or not voice_client.is_connected():
                 try:
                     await after.channel.connect()
-                    touch_in_vc()
+                    touch_work()  # 自動入室も仕事扱い
                     print(
                         f"Auto-joined VC '{after.channel.name}' in guild {member.guild.id} "
                         f"for user {member.id}"

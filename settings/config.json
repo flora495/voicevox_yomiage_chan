@@ -15,10 +15,10 @@
     "FAST_SPEED_SCALE":1.6
   },
   "aivoice": {
-    "DEFAULT_SPEED_SCALE":1.0,
+    "DEFAULT_SPEED_SCALE":1.1,
     "FAST_SPEED_SCALE":1.6,
-    "MiddlePause": 80,
-    "LongPause": 170,
-    "SentencePause": 600
+    "MiddlePause": 0,
+    "LongPause": 0,
+    "SentencePause": 0
   }
 }

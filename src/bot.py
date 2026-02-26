@@ -52,7 +52,7 @@ else:
 with CONFIG_PATH.open("r", encoding="utf-8") as f:
     CONFIG: dict = json.load(f)
 
-BOT_CONFIG=CONFIG["bot"]
+BOT_CONFIG = CONFIG["bot"]
 
 TARGET_USER_IDS = set(user_prefs.get("TARGET_USER_IDS", []))          # 読み上げ対象
 AUTOJOIN_USER_IDS = set(user_prefs.get("AUTOJOIN_USER_IDS", []))      # 自動入室対象
@@ -300,7 +300,7 @@ async def speaker(ctx: commands.Context, *, name: str | None = None):
     await ctx.send(
         f"{ctx.author.display_name} さんの読み上げキャラを「{original_name}」に変更しました。"
     )
-    
+
 
 @bot.command()
 async def readme(ctx: commands.Context):
@@ -411,7 +411,6 @@ async def casts(ctx: commands.Context):
     await ctx.send("\n".join([header, *lines]))
 
 
-
 @bot.event
 async def on_message(message: discord.Message):
     global last_work_time
@@ -445,8 +444,9 @@ async def on_message(message: discord.Message):
     if not text:
         return
 
-    # URL部分だけ「えいちてぃーてぃーぴーえすころん、以下略」に置き換える
-    text = re.sub(r"https?://\S+", "えいちてぃーてぃーぴーえすころん、以下略", text)
+    if BOT_CONFIG["URL_SKIP"]:
+        # URL部分だけ「えいちてぃーてぃーぴーえすころん、以下略」に置き換える
+        text = re.sub(r"https?://\S+", "えいちてぃーてぃーぴーえすころん、以下略", text)
 
     normal_limit = BOT_CONFIG["NORMAL_SPEED_CHAR_LIMIT"]
     truncate_limit = BOT_CONFIG["TRUNCATE_CHAR_LIMIT"]
@@ -545,6 +545,7 @@ async def on_message(message: discord.Message):
         f"synth_elapsed_total={elapsed:.3f} sec "
         f"engine={engine} char={char_name}"
     )
+
 
 @bot.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):

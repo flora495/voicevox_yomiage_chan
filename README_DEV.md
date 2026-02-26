@@ -6,14 +6,7 @@
 1. `pip install discord.py`
 1. `pip install pynacl`
 1. `pip install aivoice-python`
-1. `token.json`にDiscordのAPIトークンを追加。
-
-```
-{
-  "DISCORD_TOKEN": "ここにBotトークン"
-}
-```
-`token.json`は絶対にgithubにアップロードしないこと。
+1. `token.json`にDiscordのAPIトークンを追加。`token.json`は絶対にgithubにアップロードしないこと。
 
 ## Discord上の設定
 1. Botをサーバーに招待し、`connect`,`speak`の権限を付与する。
@@ -76,10 +69,40 @@ API TOKEN保持ファイル。Githubにアップロードしないこと。
 <br>
 また、新しいキャラクターを追加する際はここに追加するだけで可能です。
 
+### `config.json`
+```
+{
+  "bot": {
+    "IDLE_TIMEOUT": discord上でinvisibleになる時間,
+    "PLAYER_POLL_INTERVAL": 複数文章の処理中に、文章キューを確認する頻度,
+    "PRESENCE_CHECK_INTERVAL": inactivity_watcherの確認頻度,
+    "SENTENCE_SEPARATORS": 区切り文字,
+    "NORMAL_SPEED_CHAR_LIMIT":これ以上長い文章の場合、後半を倍速でしゃべる,
+    "TRUNCATE_CHAR_LIMIT":これ以上長い文章の場合は、略する,
+    "URL_SKIP":URLが入力されたときに、略すかどうか
+  },
+  "voicevox": {
+    "HOST": "localhost",
+    "PORT": 50021,
+    "DEFAULT_SPEED_SCALE":通常時の喋るスピーdl,
+    "FAST_SPEED_SCALE":倍速時の喋るスピード6
+  },
+  "aivoice": {
+    "DEFAULT_SPEED_SCALE":通常時の喋るスピーdl,
+    "FAST_SPEED_SCALE":倍速時の喋るスピード6
+    "MiddlePause": aivoice apiのパラメタ,
+    "LongPause": aivoice apiのパラメタ,
+    "SentencePause": aivoice apiのパラメタ
+  }
+}
+
+```
+
 
 ## その他の機能とか
 1. どこのボイスチャットにも入っていない状態が一定時間続くとbotのdiscord上でのステータスが自動でinvisibleになる。invisibleなだけで実際はオンラインなので、コマンドには反応します。
 1. A.I.Voiceの登録済みキャラクター一覧を確認したい場合`check_aivoice_characters.py`を実行せよ。
+1. URLは省略して読む
 
 ## エラーリスト
 1. `Failed to establish a new connection: [WinError 10061] 対象のコンピューターによって拒否されたため、接続できませんでした。`

@@ -1,12 +1,12 @@
 {
   "bot": {
     "IDLE_TIMEOUT": 1800,
-    "PLAYER_POLL_INTERVAL": 0.1,
+    "PLAYER_POLL_INTERVAL": 0.05,
     "PRESENCE_CHECK_INTERVAL": 60,
-    "MAX_TTS_LENGTH": 100,
     "SENTENCE_SEPARATORS": "。！？!?、,．.",
-    "NORMAL_SPEED_CHAR_LIMIT":50,
-    "TRUNCATE_CHAR_LIMIT":150
+    "NORMAL_SPEED_CHAR_LIMIT":100,
+    "TRUNCATE_CHAR_LIMIT":200,
+    "URL_SKIP":true
   },
   "voicevox": {
     "HOST": "localhost",
@@ -15,7 +15,7 @@
     "FAST_SPEED_SCALE":1.6
   },
   "aivoice": {
-    "DEFAULT_SPEED_SCALE":1.1,
+    "DEFAULT_SPEED_SCALE":1.0,
     "FAST_SPEED_SCALE":1.6,
     "MiddlePause": 80,
     "LongPause": 170,

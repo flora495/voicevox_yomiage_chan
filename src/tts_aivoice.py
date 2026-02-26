@@ -79,12 +79,7 @@ class AIVoiceClient(AbstractTTSClient):
         mc[key] = value
         self._ctl.master_control = json.dumps(mc)
 
-    def synth_to_wav_bytes(
-        self,
-        text: str,
-        speaker_id: str,
-        speed_scale: float | None = None,
-    ) -> bytes:
+    def synth_to_wav_bytes(self,text: str,speaker_id: str,speed_scale: float | None = 1,) -> bytes:
         """speaker_id はプリセット名（または voice_names の要素）を想定。"""
         # ★ 発話のたびに接続確認
         self._ensure_connected()
@@ -93,12 +88,11 @@ class AIVoiceClient(AbstractTTSClient):
         self._ctl.current_voice_preset_name = speaker_id
         self._ctl.text = text
 
-        # 速度スケール指定があれば、A.I.VOICE のパラメータに反映
-        if speed_scale is not None:
-            try:
-                self._set_params("Speed", speed_scale)
-            except Exception as e:
-                print("A.I.VOICE の速度パラメータ設定に失敗しました:", e)
+        # speed_scaleを反映
+        try:
+            self._set_params("Speed", speed_scale)
+        except Exception as e:
+            print("A.I.VOICE の速度パラメータ設定に失敗しました:", e)
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             tmp_path = Path(tmp.name)

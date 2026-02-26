@@ -7,7 +7,8 @@ import tempfile
 
 
 class AIVoiceClient(AbstractTTSClient):
-    def __init__(self):
+    def __init__(self,config):
+        super().__init__(config)
         self._ctl = AIVoiceTTsControl()
 
         # 利用可能なホスト名の先頭を使う

@@ -1,4 +1,5 @@
 settings/*
+!settings/config.json
 src/audio_cache
 src/__pycache__
 audio_cache 

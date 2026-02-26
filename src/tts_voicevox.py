@@ -63,9 +63,8 @@ class VoicevoxClient(AbstractTTSClient):
         )
         q.raise_for_status()
         query = q.json()
-        query["speedScale"] = 1.1
-        query["prePhonemeLength"] = 0.0
-        query["postPhonemeLength"] = 0.0
+        query["speedScale"] = self.config["default_speed_scale"]
+        
 
         s = session.post(
             f"http://{HOST}:{PORT}/synthesis",

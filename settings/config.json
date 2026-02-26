@@ -1,0 +1,16 @@
+{
+  "bot": {
+    "IDLE_TIMEOUT": 1800,
+    "PLAYER_POLL_INTERVAL": 0.1,
+    "PRESENCE_CHECK_INTERVAL": 60,
+    "MAX_TTS_LENGTH": 100,
+    "SENTENCE_SEPARATORS": "。！？!?、,．."
+  },
+  "voicevox": {
+    "host": "localhost",
+    "port": 50021,
+    "default_speed_scale":1.1
+  },
+  "aivoice": {
+  }
+}

@@ -33,6 +33,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 TOKEN_PATH = PROJECT_ROOT / "settings" / "token.json"
 USER_PREFS_PATH = PROJECT_ROOT / "settings" / "user_preferences.json"
+CONFIG_PATH = PROJECT_ROOT / "settings" / "config.json"
+
 
 # token.json からトークンを読む
 with TOKEN_PATH.open("r", encoding="utf-8") as f:
@@ -46,6 +48,12 @@ if USER_PREFS_PATH.exists():
 else:
     user_prefs = {}
 
+# config.json から設定を読む（なければ空 dict）
+with CONFIG_PATH.open("r", encoding="utf-8") as f:
+    CONFIG: dict = json.load(f)
+
+BOT_CONFIG=CONFIG["bot"]
+
 TARGET_USER_IDS = set(user_prefs.get("TARGET_USER_IDS", []))          # 読み上げ対象
 AUTOJOIN_USER_IDS = set(user_prefs.get("AUTOJOIN_USER_IDS", []))      # 自動入室対象
 
@@ -54,8 +62,8 @@ user_speakers_name: Dict[str, str] = user_prefs.get("USER_SPEAKERS", {})
 
 
 # ==== TTS クライアントを初期化 ====
-voicevox_client = VoicevoxClient()
-aivoice_client = AIVoiceClient()
+voicevox_client = VoicevoxClient(CONFIG["voicevox"])
+aivoice_client = AIVoiceClient(CONFIG["aivoice"])
 
 # ギルドごとの現在キャラ名（サーバーのデフォルトキャラ）
 guild_speakers_name: Dict[int, str] = defaultdict(lambda: DEFAULT_CHARACTER_NAME)
@@ -68,7 +76,6 @@ FFMPEG_OPTIONS = {
 }
 
 # ===== 非アクティブ監視用 =====
-IDLE_TIMEOUT = 30 * 60  # 30分
 last_work_time = time.time()  # 最後に「仕事」した時刻
 
 
@@ -147,7 +154,7 @@ async def player_task():
 
         # 前の再生が終わるのを待つ
         while vc.is_playing() or vc.is_paused():
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(BOT_CONFIG["PLAYER_POLL_INTERVAL"])
 
         wav_buf = BytesIO(wav_bytes)
         source = discord.FFmpegPCMAudio(
@@ -159,7 +166,7 @@ async def player_task():
 
         # 再生終了を待つ
         while vc.is_playing():
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(BOT_CONFIG["PLAYER_POLL_INTERVAL"])
 
 
 # ===== Discord Bot 初期化 =====
@@ -193,7 +200,7 @@ async def inactivity_watcher():
         now = time.time()
         dt = now - last_work_time
 
-        if dt <= IDLE_TIMEOUT:
+        if dt <= BOT_CONFIG["IDLE_TIMEOUT"]:
             try:
                 await bot.change_presence(status=discord.Status.online)
             except Exception as e:
@@ -204,7 +211,7 @@ async def inactivity_watcher():
             except Exception as e:
                 print("change_presence (invisible) error:", e)
 
-        await asyncio.sleep(60)
+        await asyncio.sleep(BOT_CONFIG["PRESENCE_CHECK_INTERVAL"])
 
 
 # ===== イベント・コマンド =====

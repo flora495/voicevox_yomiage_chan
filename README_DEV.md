@@ -1,12 +1,21 @@
 # VOICEVOX読み上げちゃん
 
-## ローカル設定手順
+## Discord BotのAPI tokenを取得
+1. Discord Developer Portalにアクセスし、新規アプリケーションを作成。
+1. 権限とかはいい感じに付与。
+1. API tokenをメモ。
+
+
+## サーバー設定手順
 1. VOICEVOXをインストール(HTTP APIが`localhost:50021`で動いている必要がある)。
+1. (必要なら)A.I.Voice Editorをインストール。
 1. ffmpegをインストール(PATHも通す)[1]。
 1. `pip install discord.py`
 1. `pip install pynacl`
 1. `pip install aivoice-python`
 1. `token.json`にDiscordのAPIトークンを追加。`token.json`は絶対にgithubにアップロードしないこと。
+1. その他の設定ファイルも[設定ファイル詳細](#設定ファイル詳細)を参照して作成。
+
 
 ## Discord上の設定
 1. Botをサーバーに招待し、`connect`,`speak`の権限を付与する。
@@ -14,7 +23,7 @@
 ## 起動方法
 
 1. VOICEVOXを起動。
-1. A.I.VOICE Editorを起動。
+1. (必要なら)A.I.VOICE Editorを起動。
 1. `src/bot.py`を起動。
 
 ## 設定ファイル詳細
@@ -103,7 +112,7 @@ API TOKEN保持ファイル。Githubにアップロードしないこと。
 ## その他の機能とか
 1. どこのボイスチャットにも入っていない状態が一定時間続くとbotのdiscord上でのステータスが自動でinvisibleになる。invisibleなだけで実際はオンラインなので、コマンドには反応します。
 1. A.I.Voiceの登録済みキャラクター一覧を確認したい場合`check_aivoice_characters.py`を実行せよ。
-1. URLは省略して読む
+1. URLは省略して読む。
 
 ## エラーリスト
 1. `Failed to establish a new connection: [WinError 10061] 対象のコンピューターによって拒否されたため、接続できませんでした。`

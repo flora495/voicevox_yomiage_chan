@@ -79,17 +79,18 @@ API TOKEN保持ファイル。Githubにアップロードしないこと。
     "SENTENCE_SEPARATORS": 区切り文字,
     "NORMAL_SPEED_CHAR_LIMIT":これ以上長い文章の場合、後半を倍速でしゃべる,
     "TRUNCATE_CHAR_LIMIT":これ以上長い文章の場合は、略する,
-    "URL_SKIP":URLが入力されたときに、略すかどうか
+    "URL_SKIP":URLが入力されたときに、略すかどうか,
+    "AUTOJOIN_MESSAGE": autojoinでbotが入室したときに、入室メッセージを出すかどうか
   },
   "voicevox": {
     "HOST": "localhost",
     "PORT": 50021,
-    "DEFAULT_SPEED_SCALE":通常時の喋るスピーdl,
-    "FAST_SPEED_SCALE":倍速時の喋るスピード6
+    "DEFAULT_SPEED_SCALE":通常時の喋るスピード,
+    "FAST_SPEED_SCALE":倍速時の喋るスピード,
   },
   "aivoice": {
-    "DEFAULT_SPEED_SCALE":通常時の喋るスピーdl,
-    "FAST_SPEED_SCALE":倍速時の喋るスピード6
+    "DEFAULT_SPEED_SCALE":通常時の喋るスピード,
+    "FAST_SPEED_SCALE":倍速時の喋るスピード,
     "MiddlePause": aivoice apiのパラメタ,
     "LongPause": aivoice apiのパラメタ,
     "SentencePause": aivoice apiのパラメタ

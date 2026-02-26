@@ -223,7 +223,7 @@ async def on_ready():
 
 
 # ----- 共通の入室処理ヘルパ -----
-async def _join_voice_channel(channel: discord.VoiceChannel, *, trigger_member: discord.Member | None = None):
+async def _join_voice_channel(channel: discord.VoiceChannel, *, trigger_member: discord.Member | None = None,is_autojoin:bool=False):
     """VCに参加し、join/autojoin 時と同様のメッセージを VC のテキストチャットに送る共通処理。"""
     guild = channel.guild
     voice_client = guild.voice_client
@@ -234,6 +234,9 @@ async def _join_voice_channel(channel: discord.VoiceChannel, *, trigger_member: 
     else:
         await voice_client.move_to(channel)
 
+    if is_autojoin and not BOT_CONFIG["AUTOJOIN_MESSAGE"]:
+        #この場合メッセージは出力しない
+        return 
     # キャラ名
     if trigger_member is not None:
         char_name = get_effective_character_name(guild.id, trigger_member.id)
@@ -582,7 +585,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
                 try:
                     touch_work()
                     # ここで join と同じ共通処理を使う
-                    await _join_voice_channel(after.channel, trigger_member=member)
+                    await _join_voice_channel(after.channel, trigger_member=member,is_autojoin=True)
                     print(
                         f"Auto-joined VC '{after.channel.name}' in guild {member.guild.id} "
                         f"for user {member.id}"

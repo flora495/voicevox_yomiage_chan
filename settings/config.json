@@ -6,7 +6,8 @@
     "SENTENCE_SEPARATORS": "。！？!?、,．.",
     "NORMAL_SPEED_CHAR_LIMIT":100,
     "TRUNCATE_CHAR_LIMIT":200,
-    "URL_SKIP":true
+    "URL_SKIP":true,
+    "AUTOJOIN_MESSAGE": false
   },
   "voicevox": {
     "HOST": "localhost",

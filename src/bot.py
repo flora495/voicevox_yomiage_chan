@@ -222,6 +222,33 @@ async def on_ready():
     bot.loop.create_task(player_task())
 
 
+# ----- 共通の入室処理ヘルパ -----
+async def _join_voice_channel(channel: discord.VoiceChannel, *, trigger_member: discord.Member | None = None):
+    """VCに参加し、join/autojoin 時と同様のメッセージを VC のテキストチャットに送る共通処理。"""
+    guild = channel.guild
+    voice_client = guild.voice_client
+
+    # 接続 or 移動
+    if voice_client is None:
+        await channel.connect()
+    else:
+        await voice_client.move_to(channel)
+
+    # キャラ名
+    if trigger_member is not None:
+        char_name = get_effective_character_name(guild.id, trigger_member.id)
+    else:
+        char_name = get_guild_speaker_name(guild.id)
+
+    bot_name = guild.me.display_name if guild.me else "VOICEVOX読み上げちゃん"
+
+    try:
+        await channel.send(f"{bot_name}（{char_name}）が「{channel.name}」に接続しました。")
+    except discord.Forbidden:
+        # 権限がない場合は黙って無視するなり、ログに出すなりお好みで
+        print(f"Cannot send message in voice channel {channel.id} (missing permissions).")
+
+
 @bot.command()
 async def join(ctx: commands.Context):
     """呼び出した人のVCに参加"""
@@ -231,15 +258,8 @@ async def join(ctx: commands.Context):
         await ctx.send("ボイスチャンネルに参加してから実行してね。")
         return
 
-    channel = ctx.author.voice.channel
-    if ctx.voice_client is None:
-        await channel.connect()
-    else:
-        await ctx.voice_client.move_to(channel)
+    await _join_voice_channel(ctx.author.voice.channel, trigger_member=ctx.author)
 
-    char_name = get_effective_character_name(ctx.guild.id, ctx.author.id)
-    bot_name = bot.user.display_name if bot.user else "読み上げBot"
-    await ctx.send(f"{bot_name}（{char_name}）が「{channel.name}」に接続しました。")
 
 
 @bot.command()
@@ -560,8 +580,9 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
             voice_client = member.guild.voice_client
             if voice_client is None or not voice_client.is_connected():
                 try:
-                    await after.channel.connect()
                     touch_work()
+                    # ここで join と同じ共通処理を使う
+                    await _join_voice_channel(after.channel, trigger_member=member)
                     print(
                         f"Auto-joined VC '{after.channel.name}' in guild {member.guild.id} "
                         f"for user {member.id}"

@@ -6,15 +6,11 @@ import requests
 
 from abstract_tts_client import AbstractTTSClient
 
-
-HOST = "localhost"
-PORT = 50021
 session = requests.Session()
-
 
 class VoicevoxClient(AbstractTTSClient):
     def _fetch_speakers(self):
-        url = f"http://{HOST}:{PORT}/speakers"
+        url = f"http://{self.config["HOST"]}:{self.config["PORT"]}/speakers"
         r = session.get(url)
         r.raise_for_status()
         return r.json()
@@ -55,19 +51,19 @@ class VoicevoxClient(AbstractTTSClient):
                 result[n] = str(all_map[n])
         return result
 
-    def synth_to_wav_bytes(self, text: str, speaker_id: str) -> bytes:
+    def synth_to_wav_bytes(self, text: str, speaker_id: str,speed_scale:float) -> bytes:
         sid = int(speaker_id)
         q = session.post(
-            f"http://{HOST}:{PORT}/audio_query",
+            f"http://{self.config["HOST"]}:{self.config["PORT"]}/audio_query",
             params={"text": text, "speaker": sid},
         )
         q.raise_for_status()
         query = q.json()
-        query["speedScale"] = self.config["default_speed_scale"]
+        query["speedScale"] = speed_scale
         
 
         s = session.post(
-            f"http://{HOST}:{PORT}/synthesis",
+            f"http://{self.config["HOST"]}:{self.config["PORT"]}/synthesis",
             params={"speaker": sid},
             data=json.dumps(query),
         )

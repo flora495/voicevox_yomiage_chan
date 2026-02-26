@@ -4,13 +4,21 @@
     "PLAYER_POLL_INTERVAL": 0.1,
     "PRESENCE_CHECK_INTERVAL": 60,
     "MAX_TTS_LENGTH": 100,
-    "SENTENCE_SEPARATORS": "。！？!?、,．."
+    "SENTENCE_SEPARATORS": "。！？!?、,．.",
+    "NORMAL_SPEED_CHAR_LIMIT":50,
+    "TRUNCATE_CHAR_LIMIT":150
   },
   "voicevox": {
-    "host": "localhost",
-    "port": 50021,
-    "default_speed_scale":1.1
+    "HOST": "localhost",
+    "PORT": 50021,
+    "DEFAULT_SPEED_SCALE":1.1,
+    "FAST_SPEED_SCALE":1.6
   },
   "aivoice": {
+    "DEFAULT_SPEED_SCALE":1.1,
+    "FAST_SPEED_SCALE":1.6,
+    "MiddlePause": 80,
+    "LongPause": 170,
+    "SentencePause": 600
   }
 }

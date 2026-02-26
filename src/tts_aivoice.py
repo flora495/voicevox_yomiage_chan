@@ -4,10 +4,11 @@ from pathlib import Path
 from abstract_tts_client import AbstractTTSClient
 from aivoice_python import AIVoiceTTsControl, HostStatus
 import tempfile
+import json
 
 
 class AIVoiceClient(AbstractTTSClient):
-    def __init__(self,config):
+    def __init__(self, config):
         super().__init__(config)
         self._ctl = AIVoiceTTsControl()
 
@@ -27,6 +28,11 @@ class AIVoiceClient(AbstractTTSClient):
             # ここでは落とさず、あとで synth 時にも同じエラーを返す想定
             print(e)
 
+        # パラメータの初期値を変更
+        for key in ["MiddlePause", "LongPause", "SentencePause"]:
+            if key in self.config:
+                self._set_params(key, self.config[key])
+
     def _ensure_connected(self):
         """
         A.I.VOICE Editor が起動しており、接続されていることを保証する。
@@ -43,7 +49,7 @@ class AIVoiceClient(AbstractTTSClient):
         try:
             # NotRunning 以外で Connected でなければ connect
             if status == HostStatus.NotConnected:
-                #接続が切れていたら再接続
+                # 接続が切れていたら再接続
                 print("A.I.VOICE Editorへの再接続")
                 self._ctl.connect()
         except Exception as e:
@@ -65,13 +71,34 @@ class AIVoiceClient(AbstractTTSClient):
 
         return result
 
-    def synth_to_wav_bytes(self, text: str, speaker_id: str) -> bytes:
+    def _set_params(self, key: str, value: float) -> None:
+        """
+        parameterの変更するやつ
+        """
+        mc = json.loads(self._ctl.master_control)
+        mc[key] = value
+        self._ctl.master_control = json.dumps(mc)
+
+    def synth_to_wav_bytes(
+        self,
+        text: str,
+        speaker_id: str,
+        speed_scale: float | None = None,
+    ) -> bytes:
         """speaker_id はプリセット名（または voice_names の要素）を想定。"""
         # ★ 発話のたびに接続確認
         self._ensure_connected()
 
+        # プリセットとテキストを設定
         self._ctl.current_voice_preset_name = speaker_id
         self._ctl.text = text
+
+        # 速度スケール指定があれば、A.I.VOICE のパラメータに反映
+        if speed_scale is not None:
+            try:
+                self._set_params("Speed", speed_scale)
+            except Exception as e:
+                print("A.I.VOICE の速度パラメータ設定に失敗しました:", e)
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             tmp_path = Path(tmp.name)

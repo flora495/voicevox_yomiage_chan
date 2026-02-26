@@ -115,7 +115,7 @@ def split_into_sentences(text: str) -> list[str]:
     簡易な文分割: 記号で区切る。
     区切り記号も文末に残す。
     """
-    seps = "。！？!?、,．."
+    seps = BOT_CONFIG["SENTENCE_SEPARATORS"]
     sentences = []
     buf = ""
 
@@ -445,65 +445,106 @@ async def on_message(message: discord.Message):
     if not text:
         return
 
-    if len(text) > 100:
-        text = text[:100] + " 以下略"
+    # URL部分だけ「えいちてぃーてぃーぴーえすころん、以下略」に置き換える
+    text = re.sub(r"https?://\S+", "えいちてぃーてぃーぴーえすころん、以下略", text)
 
-    sentences = split_into_sentences(text)
-    if not sentences:
+    normal_limit = BOT_CONFIG["NORMAL_SPEED_CHAR_LIMIT"]
+    truncate_limit = BOT_CONFIG["TRUNCATE_CHAR_LIMIT"]
+
+    # 前半: 通常速度で読む部分
+    normal_text = text[:normal_limit]
+    # 後半: 倍速で読む部分（長すぎる場合は切る）
+    fast_text = text[normal_limit:truncate_limit]
+
+    # さらに長い場合は最後に「以下略」を付けるフラグ
+    add_ika_ryaku = len(text) > truncate_limit
+
+    # 文分割
+    normal_sentences = split_into_sentences(normal_text) if normal_text else []
+    fast_sentences = split_into_sentences(fast_text) if fast_text else []
+
+    if not normal_sentences and not fast_sentences and not add_ika_ryaku:
         return
 
     # ==== ここから: キャラ名 → エンジン＆speaker_id 解決 ====
     char_name = get_effective_character_name(message.guild.id, message.author.id)
     info = CHARACTER_MAP.get(char_name)
-
     if info is None:
-        # 未定義キャラの場合はデフォルトにフォールバック
         info = CHARACTER_MAP[DEFAULT_CHARACTER_NAME]
 
     engine = info["engine"]
     speaker_id = info["speaker_id"]
 
-    def synth_one(sent: str) -> bytes:
+    def synth_one(sent: str, speed_scale: float) -> bytes:
         if engine == "voicevox":
-            return voicevox_client.synth_to_wav_bytes(sent, speaker_id)
+            return voicevox_client.synth_to_wav_bytes(sent, speaker_id, speed_scale=speed_scale)
         elif engine == "aivoice":
-            return aivoice_client.synth_to_wav_bytes(sent, speaker_id)
+            return aivoice_client.synth_to_wav_bytes(sent, speaker_id, speed_scale=speed_scale)
         else:
             raise ValueError(f"Unknown TTS engine: {engine}")
 
-    # 文ごとに並列で合成
-    tasks = []
-    for idx, sent in enumerate(sentences):
-        task = asyncio.to_thread(synth_one, sent)
-        tasks.append((idx, task))
+    # ---- 1) 通常部分（前半）を先に処理してキューへ ----
+    idx_counter = 0
 
-    results: list[tuple[int, bytes]] = []
-    for idx, task in tasks:
+    normal_results: list[tuple[int, bytes]] = []
+    for sent in normal_sentences:
+        try:
+            wav_bytes = await asyncio.to_thread(
+                synth_one,
+                sent,
+                CONFIG[engine]["DEFAULT_SPEED_SCALE"],
+            )
+        except Exception as e:
+            print(f"TTSエラー (normal sentence {idx_counter}, engine={engine}):", e)
+            continue
+        normal_results.append((idx_counter, wav_bytes))
+        idx_counter += 1
+
+    for idx, wav_bytes in normal_results:
+        await play_queue.put((message.guild.id, wav_bytes, message.id, idx))
+
+    # ---- 2) 倍速部分を裏で処理しつつ、通常の次に再生されるようにキューへ ----
+    fast_tasks: list[tuple[int, asyncio.Future]] = []
+    for j, sent in enumerate(fast_sentences):
+        task = asyncio.to_thread(
+            synth_one,
+            sent,
+            CONFIG[engine]["FAST_SPEED_SCALE"],
+        )
+        fast_tasks.append((idx_counter + j, task))
+
+    # fast 部分の結果を順番にキューへ
+    for idx, task in fast_tasks:
         try:
             wav_bytes = await task
         except Exception as e:
-            print(f"TTSエラー (sentence {idx}, engine={engine}):", e)
+            print(f"TTSエラー (fast sentence {idx}, engine={engine}):", e)
             continue
-        results.append((idx, wav_bytes))
-
-    if not results:
-        return
-
-    # 文の順番で並べ替えてキューに積む
-    results.sort(key=lambda x: x[0])
-
-    for idx, wav_bytes in results:
         await play_queue.put((message.guild.id, wav_bytes, message.id, idx))
+
+    idx_counter += len(fast_sentences)
+
+    # ---- 3) 文章が長すぎた場合の「以下略」を最後に通常速度で読む ----
+    if add_ika_ryaku:
+        try:
+            ika_wav = await asyncio.to_thread(
+                synth_one,
+                "以下略",
+                CONFIG[engine]["DEFAULT_SPEED_SCALE"],
+            )
+            await play_queue.put((message.guild.id, ika_wav, message.id, idx_counter))
+        except Exception as e:
+            print(f"TTSエラー (ika-ryaku, engine={engine}):", e)
 
     end = time.perf_counter()
     elapsed = end - start
     print(
         f"[TTS queued-sent] guild={message.guild.id} user={message.author.id} "
         f"len={len(message.content)} chars "
-        f"sentences={len(sentences)} synth_elapsed_total={elapsed:.3f} sec "
+        f"sentences={len(normal_sentences) + len(fast_sentences) + (1 if add_ika_ryaku else 0)} "
+        f"synth_elapsed_total={elapsed:.3f} sec "
         f"engine={engine} char={char_name}"
     )
-
 
 @bot.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):

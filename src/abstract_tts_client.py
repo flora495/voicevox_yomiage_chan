@@ -17,6 +17,6 @@ class AbstractTTSClient(ABC):
         pass
 
     @abstractmethod
-    def synth_to_wav_bytes(self, text: str, speaker_id: str) -> bytes:
+    def synth_to_wav_bytes(self, text: str, speaker_id: str,speed_scale:float) -> bytes:
         """text を speaker_id の声で読み上げた WAV データ(bytes)を返す。"""
         pass

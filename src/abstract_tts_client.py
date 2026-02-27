@@ -1,6 +1,5 @@
-# tts_base.py
+from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Dict, List
 
 
 class AbstractTTSClient(ABC):
@@ -12,7 +11,7 @@ class AbstractTTSClient(ABC):
         self.config=config
         
     @abstractmethod
-    def list_speakers(self, names: List[str] | None = None) -> Dict[str, str]:
+    def list_speakers(self, names: list[str] | None = None) -> dict[str, str]:
         """キャラ名 -> 内部ID (文字列) のマップを返す。names が指定されていれば、その中だけ絞る。"""
         pass
 

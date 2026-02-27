@@ -8,6 +8,7 @@
 #          ＼/＿＿＿＿/   （u  ⊃
 #################################################################
 
+from __future__ import annotations
 import json
 import asyncio
 import time
@@ -19,9 +20,7 @@ import re
 import unicodedata
 import discord
 from discord.ext import commands
-
-# ==== 追加: エンジン・キャラ定義 ====
-from characters import CHARACTER_MAP, DEFAULT_CHARACTER_NAME  # キャラ名→{engine,speaker_id}
+from characters import CHARACTER_MAP, DEFAULT_CHARACTER_NAME
 from tts_voicevox import VoicevoxClient
 from tts_aivoice import AIVoiceClient
 
@@ -54,8 +53,8 @@ with CONFIG_PATH.open("r", encoding="utf-8") as f:
 
 BOT_CONFIG = CONFIG["bot"]
 
-TARGET_USER_IDS = set(user_prefs.get("TARGET_USER_IDS", []))          # 読み上げ対象
-AUTOJOIN_USER_IDS = set(user_prefs.get("AUTOJOIN_USER_IDS", []))      # 自動入室対象
+TARGET_USER_IDS = set(user_prefs.get("TARGET_USER_IDS", []))  # 読み上げ対象
+AUTOJOIN_USER_IDS = set(user_prefs.get("AUTOJOIN_USER_IDS", []))  # 自動入室対象
 
 # user_id(str) -> キャラ名
 user_speakers_name: Dict[str, str] = user_prefs.get("USER_SPEAKERS", {})
@@ -68,7 +67,6 @@ aivoice_client = AIVoiceClient(CONFIG["aivoice"])
 # ギルドごとの現在キャラ名（サーバーのデフォルトキャラ）
 guild_speakers_name: Dict[int, str] = defaultdict(lambda: DEFAULT_CHARACTER_NAME)
 
-
 # ffmpeg オプション
 FFMPEG_OPTIONS = {
     "before_options": "-loglevel panic",
@@ -76,7 +74,7 @@ FFMPEG_OPTIONS = {
 }
 
 # ===== 非アクティブ監視用 =====
-last_work_time = time.time()  # 最後に「仕事」した時刻
+last_work_time = time.time()  # 最後に「仕事」した時刻を保持
 
 
 def normalize_char_name(name: str) -> str:
@@ -86,10 +84,8 @@ def normalize_char_name(name: str) -> str:
     s = re.sub(r"\s+", "", s)
     return s
 
-
 # 起動時に正規化キーのマップも作る
 NORMALIZED_CHARACTER_MAP = {normalize_char_name(name): name for name in CHARACTER_MAP.keys()}
-
 
 def save_user_preferences():
     """user_preferences.json に現在の設定を書き戻す。"""
@@ -223,7 +219,7 @@ async def on_ready():
 
 
 # ----- 共通の入室処理ヘルパ -----
-async def _join_voice_channel(channel: discord.VoiceChannel, *, trigger_member: discord.Member | None = None,is_autojoin:bool=False):
+async def _join_voice_channel(channel: discord.VoiceChannel, *, trigger_member: discord.Member | None = None, is_autojoin: bool = False):
     """VCに参加し、join/autojoin 時と同様のメッセージを VC のテキストチャットに送る共通処理。"""
     guild = channel.guild
     voice_client = guild.voice_client
@@ -235,8 +231,8 @@ async def _join_voice_channel(channel: discord.VoiceChannel, *, trigger_member: 
         await voice_client.move_to(channel)
 
     if is_autojoin and not BOT_CONFIG["AUTOJOIN_MESSAGE"]:
-        #この場合メッセージは出力しない
-        return 
+        # この場合メッセージは出力しない
+        return
     # キャラ名
     if trigger_member is not None:
         char_name = get_effective_character_name(guild.id, trigger_member.id)
@@ -262,7 +258,6 @@ async def join(ctx: commands.Context):
         return
 
     await _join_voice_channel(ctx.author.voice.channel, trigger_member=ctx.author)
-
 
 
 @bot.command()
@@ -585,7 +580,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
                 try:
                     touch_work()
                     # ここで join と同じ共通処理を使う
-                    await _join_voice_channel(after.channel, trigger_member=member,is_autojoin=True)
+                    await _join_voice_channel(after.channel, trigger_member=member, is_autojoin=True)
                     print(
                         f"Auto-joined VC '{after.channel.name}' in guild {member.guild.id} "
                         f"for user {member.id}"

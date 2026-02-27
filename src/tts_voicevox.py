@@ -1,6 +1,5 @@
 # tts_voicevox.py
-from typing import Dict, List
-from pathlib import Path
+from __future__ import annotations
 import json
 import requests
 
@@ -15,9 +14,9 @@ class VoicevoxClient(AbstractTTSClient):
         r.raise_for_status()
         return r.json()
 
-    def _build_name_to_id_map(self) -> Dict[str, int]:
+    def _build_name_to_id_map(self) -> dict[str, int]:
         data = self._fetch_speakers()
-        mapping: Dict[str, int] = {}
+        mapping: dict[str, int] = {}
         preferred_style_names = ["ノーマル", "normal", "ふつう"]
 
         for sp in data:
@@ -41,17 +40,17 @@ class VoicevoxClient(AbstractTTSClient):
 
         return mapping
 
-    def list_speakers(self, names: List[str] | None = None) -> Dict[str, str]:
+    def list_speakers(self, names: list[str] | None = None) -> dict[str, str]:
         all_map = self._build_name_to_id_map()
         if names is None:
             return {k: str(v) for k, v in all_map.items()}
-        result: Dict[str, str] = {}
+        result: dict[str, str] = {}
         for n in names:
             if n in all_map:
                 result[n] = str(all_map[n])
         return result
 
-    def synth_to_wav_bytes(self, text: str, speaker_id: str,speed_scale:float) -> bytes:
+    def synth_to_wav_bytes(self, text: str, speaker_id: str, speed_scale: float) -> bytes:
         sid = int(speaker_id)
         q = session.post(
             f"http://{self.config["HOST"]}:{self.config["PORT"]}/audio_query",
@@ -60,7 +59,6 @@ class VoicevoxClient(AbstractTTSClient):
         q.raise_for_status()
         query = q.json()
         query["speedScale"] = speed_scale
-        
 
         s = session.post(
             f"http://{self.config["HOST"]}:{self.config["PORT"]}/synthesis",

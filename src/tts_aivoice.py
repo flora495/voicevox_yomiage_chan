@@ -1,5 +1,5 @@
 # tts_aivoice.py
-from typing import Dict, List
+from __future__ import annotations
 from pathlib import Path
 from abstract_tts_client import AbstractTTSClient
 from aivoice_python import AIVoiceTTsControl, HostStatus
@@ -8,7 +8,7 @@ import json
 
 
 class AIVoiceClient(AbstractTTSClient):
-    def __init__(self, config):
+    def __init__(self, config: dict[str, int | str]):
         super().__init__(config)
         self._ctl = AIVoiceTTsControl()
 
@@ -23,7 +23,7 @@ class AIVoiceClient(AbstractTTSClient):
 
         # 最初の接続（Editor が起動していなければ失敗→ログだけ出す）
         try:
-            self._ensure_connected()
+            self._ensure_connected(first_connect=True)
         except RuntimeError as e:
             # ここでは落とさず、あとで synth 時にも同じエラーを返す想定
             print(e)
@@ -33,7 +33,7 @@ class AIVoiceClient(AbstractTTSClient):
             if key in self.config:
                 self._set_params(key, self.config[key])
 
-    def _ensure_connected(self):
+    def _ensure_connected(self, first_connect: bool = False):
         """
         A.I.VOICE Editor が起動しており、接続されていることを保証する。
         A.I.VOICE Editorへの接続は10分何もしないと自動で切断される仕様、切断されたらしゃべるときに自動で再接続します。
@@ -50,16 +50,16 @@ class AIVoiceClient(AbstractTTSClient):
             # NotRunning 以外で Connected でなければ connect
             if status == HostStatus.NotConnected:
                 # 接続が切れていたら再接続
-                print("A.I.VOICE Editorへの再接続")
+                print("A.I.VOICE Editorへ接続します" if first_connect else "A.I.VOICE Editorへ再接続します")
                 self._ctl.connect()
         except Exception as e:
             msg = f"A.I.VOICE Editor への接続に失敗しました: {e}"
             print(msg)
             raise RuntimeError(msg)
 
-    def list_speakers(self, names: List[str] | None = None) -> Dict[str, str]:
+    def list_speakers(self, names: list[str] | None = None) -> dict[str, str]:
         all_names = self._ctl.voice_names  # 実際の aivoice_python の API に合わせる
-        result: Dict[str, str] = {}
+        result: dict[str, str] = {}
 
         if names is None:
             for n in all_names:
@@ -79,7 +79,7 @@ class AIVoiceClient(AbstractTTSClient):
         mc[key] = value
         self._ctl.master_control = json.dumps(mc)
 
-    def synth_to_wav_bytes(self,text: str,speaker_id: str,speed_scale: float | None = 1,) -> bytes:
+    def synth_to_wav_bytes(self, text: str, speaker_id: str, speed_scale: float | None = 1,) -> bytes:
         """speaker_id はプリセット名（または voice_names の要素）を想定。"""
         # ★ 発話のたびに接続確認
         self._ensure_connected()

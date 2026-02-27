@@ -13,13 +13,17 @@ Engine = Literal["voicevox", "aivoice"]
 class CharacterInfo(TypedDict):
     engine: Engine
     speaker_id: str          # VOICEVOX: 数値IDをstr化, A.I.VOICE: キャラ名そのもの
-    allowed_user_ids: List[int]
+    allowed_user_ids: list[int]
 
 
 # ===== VOICEVOX: /speakers から動的に ID 解決 =====
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = PROJECT_ROOT / "settings" / "config.json"
+with CONFIG_PATH.open("r", encoding="utf-8") as f:
+    CONFIG: dict = json.load(f)
 
-VOICEVOX_HOST = "localhost"
-VOICEVOX_PORT = 50021
+VOICEVOX_HOST = CONFIG["voicevox"]["HOST"]
+VOICEVOX_PORT = CONFIG["voicevox"]["PORT"]
 _voicevox_session = requests.Session()
 
 
@@ -30,9 +34,9 @@ def _voicevox_fetch_speakers():
     return r.json()
 
 
-def _voicevox_build_name_to_id_map() -> Dict[str, int]:
+def _voicevox_build_name_to_id_map() -> dict[str, int]:
     data = _voicevox_fetch_speakers()
-    mapping: Dict[str, int] = {}
+    mapping: dict[str, int] = {}
 
     preferred_style_names = ["ノーマル", "normal", "ふつう"]
 
@@ -60,7 +64,7 @@ def _voicevox_build_name_to_id_map() -> Dict[str, int]:
 
 # ===== A.I.VOICE: 利用可能なプリセット名一覧（バリデーション用・任意） =====
 
-def _aivoice_get_voice_preset_names() -> List[str]:
+def _aivoice_get_voice_preset_names() -> list[str]:
     tts = AIVoiceTTsControl()
     host_names = tts.get_available_host_names()
     if not host_names:
@@ -86,12 +90,12 @@ def _load_raw_config():
         return json.load(f)
 
 
-def _build_character_map() -> tuple[Dict[str, CharacterInfo], str]:
+def _build_character_map() -> tuple[dict[str, CharacterInfo], str]:
     conf = _load_raw_config()
-    raw_chars: Dict[str, dict] = conf.get("characters", {})
+    raw_chars: dict[str, dict] = conf.get("characters", {})
     default_name: str = conf.get("default_character", "")
 
-    char_map: Dict[str, CharacterInfo] = {}
+    char_map: dict[str, CharacterInfo] = {}
 
     # VOICEVOX name -> id
     try:
@@ -109,7 +113,7 @@ def _build_character_map() -> tuple[Dict[str, CharacterInfo], str]:
 
     for name, info in raw_chars.items():
         engine: Engine = info["engine"]
-        allowed: List[int] = info.get("allowed_user_ids", [])
+        allowed: list[int] = info.get("allowed_user_ids", [])
 
         if engine == "voicevox":
             sid = vv_name_to_id.get(name)

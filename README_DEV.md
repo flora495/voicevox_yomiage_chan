@@ -3,7 +3,7 @@
 ## Discord BotのAPI tokenを取得
 1. Discord Developer Portalにアクセスし、新規アプリケーションを作成。
 1. 権限とかはいい感じに付与。
-1. API tokenをメモ。
+1. API tokenを生成してメモ。
 
 
 ## サーバー設定手順

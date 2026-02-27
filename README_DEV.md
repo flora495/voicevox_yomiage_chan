@@ -117,7 +117,7 @@ API TOKEN保持ファイル。Githubにアップロードしないこと。
 ## エラーリスト
 1. `Failed to establish a new connection: [WinError 10061] 対象のコンピューターによって拒否されたため、接続できませんでした。`
 　VOICEVOXのポートが解放されていないことが原因、起動すれば勝手に解放する。
-1. `aivoice-python`の`AIVoiceTTsControl.status()`にバグがありました。修正した関数を`aivoice-python修正部分.py`に書きました。`status`が常に`HostStatus.NotConnected`になるというもので、これだとaivoiceがしゃべるたびに再接続することになりますが、レスポンスタイムはあんまり変わらなかったので、そこまで気にしなくてもよいかも。気になるなら修正ファイルを取り込む。
+1. ~~`aivoice-python`の`AIVoiceTTsControl.status()`にバグがありました。修正した関数を`aivoice-python修正部分.py`に書きました。`status`が常に`HostStatus.NotConnected`になるというもので、これだとaivoiceがしゃべるたびに再接続することになりますが、レスポンスタイムはあんまり変わらなかったので、そこまで気にしなくてもよいかも。気になるなら修正ファイルを取り込む。~~ aivoice-python v0.1.6で修正されました。
 
 ## ref
 [1] https://32blog.com/programing/ffmpeg-install-guide/

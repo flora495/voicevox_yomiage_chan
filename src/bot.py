@@ -84,8 +84,10 @@ def normalize_char_name(name: str) -> str:
     s = re.sub(r"\s+", "", s)
     return s
 
+
 # 起動時に正規化キーのマップも作る
 NORMALIZED_CHARACTER_MAP = {normalize_char_name(name): name for name in CHARACTER_MAP.keys()}
+
 
 def save_user_preferences():
     """user_preferences.json に現在の設定を書き戻す。"""
@@ -187,13 +189,20 @@ def get_effective_character_name(guild_id: int, user_id: int) -> str:
 
 async def inactivity_watcher():
     """
-    最後に「仕事」(VC入室 or コマンド/メッセージ処理)をしてから
-    一定時間(IDLE_TIMEOUT)が経過したら、ステータスを invisible に。
+    最後に「仕事」(VCに存在 or コマンド処理)をしてから一定時間(IDLE_TIMEOUT)が経過したら、ステータスをinvisibleに。
     仕事中は online。
     """
     await bot.wait_until_ready()
     while not bot.is_closed():
         now = time.time()
+
+        # どこかのギルドで VC に繋がっているかをチェック
+        any_connected = any(guild.voice_client is not None and guild.voice_client.is_connected()for guild in bot.guilds)
+
+        if any_connected:
+            # VCにいる間は何もしていなくても常に「仕事中」とみなす。
+            touch_work()
+
         dt = now - last_work_time
 
         if dt <= BOT_CONFIG["IDLE_TIMEOUT"]:
@@ -431,32 +440,30 @@ async def casts(ctx: commands.Context):
 
 @bot.event
 async def on_message(message: discord.Message):
-    global last_work_time
-
-    start = time.perf_counter()
-
     # Bot自身やDMは無視
     if message.author.bot or message.guild is None:
         return
 
-    # コマンドは読み上げ対象外
+    # コマンド読まない。
     if message.content.startswith(COMMAND_PREFIX):
         touch_work()
         await bot.process_commands(message)
         return
 
-    # 特定ユーザ以外は読まない
+    # TARGET_USER以外は読まない
     if message.author.id not in TARGET_USER_IDS:
         await bot.process_commands(message)
         return
 
-    # ここまで来たら「読み上げ対象のメッセージ」
-    touch_work()
     await bot.process_commands(message)
 
     vc = message.guild.voice_client
     if vc is None or not vc.is_connected():
-        return  # VCにいないときは読み上げない
+        # botがVCにいないときは読み上げもせず、仕事した判定にもならない
+        return
+
+    ### ここから先は読み上げ処理###
+    touch_work()
 
     text = message.content.strip()
     if not text:
@@ -484,7 +491,7 @@ async def on_message(message: discord.Message):
     if not normal_sentences and not fast_sentences and not add_ika_ryaku:
         return
 
-    # ==== ここから: キャラ名 → エンジン＆speaker_id 解決 ====
+    # ==== キャラ名 → エンジン＆speaker_id 解決 ====
     char_name = get_effective_character_name(message.guild.id, message.author.id)
     info = CHARACTER_MAP.get(char_name)
     if info is None:
@@ -501,9 +508,10 @@ async def on_message(message: discord.Message):
         else:
             raise ValueError(f"Unknown TTS engine: {engine}")
 
-    # ---- 1) 通常部分（前半）を先に処理してキューへ ----
-    idx_counter = 0
+    start = time.perf_counter()
 
+    # ---- 1) 通常部分（前半） ----
+    idx_counter = 0
     normal_results: list[tuple[int, bytes]] = []
     for sent in normal_sentences:
         try:
@@ -521,7 +529,7 @@ async def on_message(message: discord.Message):
     for idx, wav_bytes in normal_results:
         await play_queue.put((message.guild.id, wav_bytes, message.id, idx))
 
-    # ---- 2) 倍速部分を裏で処理しつつ、通常の次に再生されるようにキューへ ----
+    # ---- 2) 倍速部分（後半） ----
     fast_tasks: list[tuple[int, asyncio.Future]] = []
     for j, sent in enumerate(fast_sentences):
         task = asyncio.to_thread(
@@ -531,7 +539,6 @@ async def on_message(message: discord.Message):
         )
         fast_tasks.append((idx_counter + j, task))
 
-    # fast 部分の結果を順番にキューへ
     for idx, task in fast_tasks:
         try:
             wav_bytes = await task
@@ -542,7 +549,7 @@ async def on_message(message: discord.Message):
 
     idx_counter += len(fast_sentences)
 
-    # ---- 3) 文章が長すぎた場合の「以下略」を最後に通常速度で読む ----
+    # ---- 3) 「以下略」 ----
     if add_ika_ryaku:
         try:
             ika_wav = await asyncio.to_thread(

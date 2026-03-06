@@ -9,6 +9,7 @@
 #################################################################
 
 from __future__ import annotations
+import os
 import json
 import asyncio
 import time
@@ -233,11 +234,19 @@ async def _join_voice_channel(channel: discord.VoiceChannel, *, trigger_member: 
     guild = channel.guild
     voice_client = guild.voice_client
 
-    # 接続 or 移動
-    if voice_client is None:
-        await channel.connect()
-    else:
-        await voice_client.move_to(channel)
+    try:
+        # 接続 or 移動
+        if voice_client is None:
+            await channel.connect()
+        else:
+            await voice_client.move_to(channel)
+    except asyncio.TimeoutError as e:
+        print(f"[FATAL] voice connect timeout: guild={guild.id} ch={channel.id}: {e!r}")
+        os._exit(1)  # 強制終了
+    except Exception as e:
+        # 4017 など websocket 関連で落ちる場合もまとめて殺したいならこちらも
+        print(f"[FATAL] voice connect error: guild={guild.id} ch={channel.id}: {e!r}")
+        os._exit(1)
 
     if is_autojoin and not BOT_CONFIG["AUTOJOIN_MESSAGE"]:
         # この場合メッセージは出力しない

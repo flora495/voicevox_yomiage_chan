@@ -12,6 +12,7 @@
 1. ffmpegをインストール(PATHも通す)[1]。
 1. `pip install discord.py`
 1. `pip install pynacl`
+1. `pip install davey`
 1. `pip install aivoice-python`
 1. `token.json`にDiscordのAPIトークンを追加。`token.json`は絶対にgithubにアップロードしないこと。
 1. その他の設定ファイルも[設定ファイル詳細](#設定ファイル詳細)を参照して作成。

@@ -1,6 +1,6 @@
 {
   "bot": {
-    "IDLE_TIMEOUT": 1800,
+    "IDLE_TIMEOUT": null,
     "PLAYER_POLL_INTERVAL": 0.05,
     "PRESENCE_CHECK_INTERVAL": 60,
     "SENTENCE_SEPARATORS": "。！？!?、,．.",

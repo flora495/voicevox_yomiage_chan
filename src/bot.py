@@ -205,8 +205,11 @@ async def inactivity_watcher():
             touch_work()
 
         dt = now - last_work_time
-
-        if dt <= BOT_CONFIG["IDLE_TIMEOUT"]:
+        
+        if BOT_CONFIG["IDLE_TIMEOUT"] is None:
+            #Noneなら常にオンラインをキープ
+            pass
+        elif dt <= BOT_CONFIG["IDLE_TIMEOUT"]:
             try:
                 await bot.change_presence(status=discord.Status.online)
             except Exception as e:

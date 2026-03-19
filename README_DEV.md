@@ -83,7 +83,7 @@ API TOKEN保持ファイル。Githubにアップロードしないこと。
 ```
 {
   "bot": {
-    "IDLE_TIMEOUT": discord上でinvisibleになる時間,
+    "IDLE_TIMEOUT": discord上でinvisibleになる時間。nullなら起動中常にオンライン,
     "PLAYER_POLL_INTERVAL": 複数文章の処理中に、文章キューを確認する頻度,
     "PRESENCE_CHECK_INTERVAL": inactivity_watcherの確認頻度,
     "SENTENCE_SEPARATORS": 区切り文字,
